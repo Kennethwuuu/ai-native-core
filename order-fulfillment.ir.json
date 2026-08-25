@@ -1,0 +1,1442 @@
+{
+  "ir_version": "aicore.ir/0.1",
+  "content_id": "aicore-content-sha256:c751e0f43bcd5293e4266010ac28e9addabc60d7740a5bd342b286d6f89d875f",
+  "semantic": {
+    "program_id": "program:order-fulfillment",
+    "vocabularies": [
+      {
+        "vocabulary_id": "aicore.composition/0.1",
+        "required": true
+      },
+      {
+        "vocabulary_id": "aicore.kernel/0.1",
+        "required": true
+      },
+      {
+        "vocabulary_id": "aicore.knowledge/0.1",
+        "required": true
+      },
+      {
+        "vocabulary_id": "aicore.temporal/0.1",
+        "required": true
+      }
+    ],
+    "imports": [],
+    "types": [
+      {
+        "type_id": "type:fulfillment-result",
+        "definition": {
+          "kind": "enum",
+          "values": [
+            "compensated",
+            "completed"
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "type_id": "type:inventory-reservation",
+        "definition": {
+          "kind": "record",
+          "fields": [
+            {
+              "field_id": "order_id",
+              "type_id": "core:string",
+              "required": true
+            },
+            {
+              "field_id": "reservation_id",
+              "type_id": "core:string",
+              "required": true
+            },
+            {
+              "field_id": "status",
+              "type_id": "type:inventory-status",
+              "required": true
+            }
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "type_id": "type:inventory-status",
+        "definition": {
+          "kind": "enum",
+          "values": [
+            "held",
+            "released",
+            "unknown"
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "type_id": "type:order",
+        "definition": {
+          "kind": "record",
+          "fields": [
+            {
+              "field_id": "id",
+              "type_id": "core:string",
+              "required": true
+            },
+            {
+              "field_id": "total",
+              "type_id": "core:decimal",
+              "required": true
+            }
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "type_id": "type:payment",
+        "definition": {
+          "kind": "record",
+          "fields": [
+            {
+              "field_id": "intent_id",
+              "type_id": "core:string",
+              "required": true
+            },
+            {
+              "field_id": "receipt",
+              "type_id": "type:receipt",
+              "required": false
+            },
+            {
+              "field_id": "status",
+              "type_id": "type:payment-status",
+              "required": true
+            }
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "type_id": "type:payment-status",
+        "definition": {
+          "kind": "enum",
+          "values": [
+            "failed",
+            "prepared",
+            "refunded",
+            "succeeded",
+            "unknown"
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "type_id": "type:receipt",
+        "definition": {
+          "kind": "record",
+          "fields": [
+            {
+              "field_id": "amount",
+              "type_id": "core:decimal",
+              "required": true
+            },
+            {
+              "field_id": "intent_id",
+              "type_id": "core:string",
+              "required": true
+            },
+            {
+              "field_id": "signature_valid",
+              "type_id": "core:boolean",
+              "required": true
+            }
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "type_id": "type:shipment",
+        "definition": {
+          "kind": "record",
+          "fields": [
+            {
+              "field_id": "shipment_id",
+              "type_id": "core:string",
+              "required": true
+            },
+            {
+              "field_id": "status",
+              "type_id": "type:shipment-status",
+              "required": true
+            }
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "type_id": "type:shipment-status",
+        "definition": {
+          "kind": "enum",
+          "values": [
+            "created",
+            "unknown"
+          ]
+        },
+        "extensions": {}
+      }
+    ],
+    "nodes": [
+      {
+        "node_id": "constraint:accepted-payment-receipt",
+        "kernel_kind": "constraint",
+        "form": "assurance",
+        "constraint": {
+          "scope": "step",
+          "expression": {
+            "expr": "apply",
+            "operator": "core:and",
+            "arguments": [
+              {
+                "expr": "apply",
+                "operator": "core:eq",
+                "arguments": [
+                  {
+                    "expr": "reference",
+                    "target": {
+                      "node_id": "state:payment",
+                      "port_id": "current",
+                      "path": [
+                        "receipt",
+                        "intent_id"
+                      ]
+                    },
+                    "result_type": "core:string"
+                  },
+                  {
+                    "expr": "reference",
+                    "target": {
+                      "node_id": "state:payment",
+                      "port_id": "current",
+                      "path": [
+                        "intent_id"
+                      ]
+                    },
+                    "result_type": "core:string"
+                  }
+                ],
+                "result_type": "core:boolean"
+              },
+              {
+                "expr": "reference",
+                "target": {
+                  "node_id": "state:payment",
+                  "port_id": "current",
+                  "path": [
+                    "receipt",
+                    "signature_valid"
+                  ]
+                },
+                "result_type": "core:boolean"
+              }
+            ],
+            "result_type": "core:boolean"
+          },
+          "assurance_profile": "aicore.knowledge/0.1:external-effect",
+          "applies_to": [
+            "transition:create-shipment"
+          ],
+          "diagnostic_code": "AIC-PAYMENT-RECEIPT-001"
+        },
+        "extensions": {}
+      },
+      {
+        "node_id": "constraint:at-most-one-capture",
+        "kernel_kind": "constraint",
+        "form": "rule",
+        "constraint": {
+          "scope": "trace",
+          "expression": {
+            "expr": "apply",
+            "operator": "core:lte",
+            "arguments": [
+              {
+                "expr": "apply",
+                "operator": "aicore.temporal/0.1:count-outcome",
+                "arguments": [
+                  {
+                    "expr": "literal",
+                    "literal_type": "core:string",
+                    "value": "transition:capture-payment#captured"
+                  }
+                ],
+                "result_type": "core:integer"
+              },
+              {
+                "expr": "literal",
+                "literal_type": "core:integer",
+                "value": "1"
+              }
+            ],
+            "result_type": "core:boolean"
+          },
+          "assurance_profile": null,
+          "applies_to": [
+            "transition:capture-payment",
+            "transition:fulfill-order"
+          ],
+          "diagnostic_code": "AIC-PAYMENT-CAPTURE-001"
+        },
+        "extensions": {}
+      },
+      {
+        "node_id": "constraint:charge-creates-obligation",
+        "kernel_kind": "constraint",
+        "form": "rule",
+        "constraint": {
+          "scope": "trace",
+          "expression": {
+            "expr": "apply",
+            "operator": "aicore.temporal/0.1:always",
+            "arguments": [
+              {
+                "expr": "apply",
+                "operator": "core:implies",
+                "arguments": [
+                  {
+                    "expr": "apply",
+                    "operator": "core:eq",
+                    "arguments": [
+                      {
+                        "expr": "reference",
+                        "target": {
+                          "node_id": "state:payment",
+                          "port_id": "current",
+                          "path": [
+                            "status"
+                          ]
+                        },
+                        "result_type": "type:payment-status"
+                      },
+                      {
+                        "expr": "literal",
+                        "literal_type": "type:payment-status",
+                        "value": "succeeded"
+                      }
+                    ],
+                    "result_type": "core:boolean"
+                  },
+                  {
+                    "expr": "apply",
+                    "operator": "aicore.temporal/0.1:eventually-obligation-closed",
+                    "arguments": [
+                      {
+                        "expr": "literal",
+                        "literal_type": "core:string",
+                        "value": "payment-capture"
+                      }
+                    ],
+                    "result_type": "core:boolean"
+                  }
+                ],
+                "result_type": "core:boolean"
+              }
+            ],
+            "result_type": "core:boolean"
+          },
+          "assurance_profile": null,
+          "applies_to": [
+            "transition:capture-payment",
+            "transition:fulfill-order"
+          ],
+          "diagnostic_code": "AIC-PAYMENT-OBLIGATION-001"
+        },
+        "extensions": {}
+      },
+      {
+        "node_id": "constraint:no-shipment-with-unknown-payment",
+        "kernel_kind": "constraint",
+        "form": "rule",
+        "constraint": {
+          "scope": "step",
+          "expression": {
+            "expr": "apply",
+            "operator": "core:implies",
+            "arguments": [
+              {
+                "expr": "apply",
+                "operator": "core:eq",
+                "arguments": [
+                  {
+                    "expr": "reference",
+                    "target": {
+                      "node_id": "state:payment",
+                      "port_id": "current",
+                      "path": [
+                        "status"
+                      ]
+                    },
+                    "result_type": "type:payment-status"
+                  },
+                  {
+                    "expr": "literal",
+                    "literal_type": "type:payment-status",
+                    "value": "unknown"
+                  }
+                ],
+                "result_type": "core:boolean"
+              },
+              {
+                "expr": "apply",
+                "operator": "core:not",
+                "arguments": [
+                  {
+                    "expr": "apply",
+                    "operator": "aicore.knowledge/0.1:enabled",
+                    "arguments": [
+                      {
+                        "expr": "literal",
+                        "literal_type": "core:string",
+                        "value": "transition:create-shipment"
+                      }
+                    ],
+                    "result_type": "core:boolean"
+                  }
+                ],
+                "result_type": "core:boolean"
+              }
+            ],
+            "result_type": "core:boolean"
+          },
+          "assurance_profile": "aicore.knowledge/0.1:external-effect",
+          "applies_to": [
+            "transition:create-shipment"
+          ],
+          "diagnostic_code": "AIC-SHIPMENT-PAYMENT-001"
+        },
+        "extensions": {}
+      },
+      {
+        "node_id": "state:inventory-reservation",
+        "kernel_kind": "state",
+        "form": "schema",
+        "schema": {
+          "type_id": "type:inventory-reservation",
+          "partial": true,
+          "claimable_paths": [
+            [
+              "reservation_id"
+            ],
+            [
+              "status"
+            ]
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "node_id": "state:payment",
+        "kernel_kind": "state",
+        "form": "schema",
+        "schema": {
+          "type_id": "type:payment",
+          "partial": true,
+          "claimable_paths": [
+            [
+              "intent_id"
+            ],
+            [
+              "receipt"
+            ],
+            [
+              "status"
+            ]
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "node_id": "state:shipment",
+        "kernel_kind": "state",
+        "form": "schema",
+        "schema": {
+          "type_id": "type:shipment",
+          "partial": true,
+          "claimable_paths": [
+            [
+              "shipment_id"
+            ],
+            [
+              "status"
+            ]
+          ]
+        },
+        "extensions": {}
+      },
+      {
+        "node_id": "transition:capture-payment",
+        "kernel_kind": "transition",
+        "form": "action",
+        "contract": {
+          "inputs": [
+            {
+              "port_id": "order",
+              "type_id": "type:order",
+              "required": true
+            },
+            {
+              "port_id": "reservation",
+              "type_id": "type:inventory-reservation",
+              "required": true
+            }
+          ],
+          "outputs": [],
+          "preconditions": [
+            {
+              "expr": "apply",
+              "operator": "core:gt",
+              "arguments": [
+                {
+                  "expr": "reference",
+                  "target": {
+                    "node_id": "transition:capture-payment",
+                    "port_id": "order",
+                    "path": [
+                      "total"
+                    ]
+                  },
+                  "result_type": "core:decimal"
+                },
+                {
+                  "expr": "literal",
+                  "literal_type": "core:decimal",
+                  "value": "0"
+                }
+              ],
+              "result_type": "core:boolean"
+            }
+          ],
+          "outcomes": [
+            {
+              "outcome_id": "captured",
+              "type_id": "type:receipt",
+              "postconditions": [],
+              "effect_summary": [
+                "effect:payment-capture"
+              ],
+              "evidence_obligations": [
+                "constraint:accepted-payment-receipt"
+              ]
+            },
+            {
+              "outcome_id": "not-captured",
+              "type_id": "core:reason",
+              "postconditions": [],
+              "effect_summary": [],
+              "evidence_obligations": [
+                "evidence:authoritative-no-capture"
+              ]
+            }
+          ],
+          "postconditions": [],
+          "effects": [
+            {
+              "effect_id": "effect:payment-capture",
+              "kind": "invoke",
+              "resource": "payment-gateway:capture",
+              "mode": "write"
+            }
+          ],
+          "required_capabilities": [
+            "capability:payment-capture"
+          ],
+          "preserved_constraints": [
+            "constraint:at-most-one-capture",
+            "constraint:charge-creates-obligation"
+          ],
+          "evidence_obligations": [
+            "evidence:stable-intent-id",
+            "evidence:unique-invocation-id"
+          ]
+        },
+        "composition": null,
+        "extensions": {}
+      },
+      {
+        "node_id": "transition:create-shipment",
+        "kernel_kind": "transition",
+        "form": "action",
+        "contract": {
+          "inputs": [
+            {
+              "port_id": "payment",
+              "type_id": "type:payment",
+              "required": true
+            }
+          ],
+          "outputs": [],
+          "preconditions": [
+            {
+              "expr": "apply",
+              "operator": "aicore.knowledge/0.1:accepted-by",
+              "arguments": [
+                {
+                  "expr": "literal",
+                  "literal_type": "core:string",
+                  "value": "constraint:accepted-payment-receipt"
+                }
+              ],
+              "result_type": "core:boolean"
+            }
+          ],
+          "outcomes": [
+            {
+              "outcome_id": "created",
+              "type_id": "type:shipment",
+              "postconditions": [],
+              "effect_summary": [
+                "effect:shipment-create"
+              ],
+              "evidence_obligations": [
+                "evidence:shipment-receipt"
+              ]
+            }
+          ],
+          "postconditions": [],
+          "effects": [
+            {
+              "effect_id": "effect:shipment-create",
+              "kind": "invoke",
+              "resource": "shipping-carrier:create",
+              "mode": "write"
+            }
+          ],
+          "required_capabilities": [
+            "capability:shipping-create"
+          ],
+          "preserved_constraints": [
+            "constraint:no-shipment-with-unknown-payment"
+          ],
+          "evidence_obligations": [
+            "constraint:accepted-payment-receipt"
+          ]
+        },
+        "composition": null,
+        "extensions": {}
+      },
+      {
+        "node_id": "transition:fulfill-order",
+        "kernel_kind": "transition",
+        "form": "composition",
+        "contract": {
+          "inputs": [
+            {
+              "port_id": "order",
+              "type_id": "type:order",
+              "required": true
+            },
+            {
+              "port_id": "payment",
+              "type_id": "type:payment",
+              "required": true
+            },
+            {
+              "port_id": "reservation",
+              "type_id": "type:inventory-reservation",
+              "required": true
+            }
+          ],
+          "outputs": [],
+          "preconditions": [],
+          "outcomes": [
+            {
+              "outcome_id": "compensated",
+              "type_id": "type:fulfillment-result",
+              "postconditions": [],
+              "effect_summary": [
+                "effect:inventory-release"
+              ],
+              "evidence_obligations": [
+                "evidence:inventory-release-receipt"
+              ]
+            },
+            {
+              "outcome_id": "completed",
+              "type_id": "type:fulfillment-result",
+              "postconditions": [],
+              "effect_summary": [
+                "effect:payment-capture",
+                "effect:shipment-create"
+              ],
+              "evidence_obligations": [
+                "constraint:accepted-payment-receipt",
+                "evidence:shipment-receipt"
+              ]
+            }
+          ],
+          "postconditions": [],
+          "effects": [
+            {
+              "effect_id": "effect:inventory-release",
+              "kind": "invoke",
+              "resource": "inventory:release",
+              "mode": "write"
+            },
+            {
+              "effect_id": "effect:payment-capture",
+              "kind": "invoke",
+              "resource": "payment-gateway:capture",
+              "mode": "write"
+            },
+            {
+              "effect_id": "effect:payment-read",
+              "kind": "invoke",
+              "resource": "payment-gateway:read",
+              "mode": "read"
+            },
+            {
+              "effect_id": "effect:shipment-create",
+              "kind": "invoke",
+              "resource": "shipping-carrier:create",
+              "mode": "write"
+            }
+          ],
+          "required_capabilities": [
+            "capability:inventory-release",
+            "capability:payment-capture",
+            "capability:payment-read",
+            "capability:shipping-create"
+          ],
+          "preserved_constraints": [
+            "constraint:at-most-one-capture",
+            "constraint:charge-creates-obligation",
+            "constraint:no-shipment-with-unknown-payment"
+          ],
+          "evidence_obligations": [
+            "constraint:accepted-payment-receipt"
+          ]
+        },
+        "composition": {
+          "kind": "graph",
+          "children": [
+            "transition:capture-payment",
+            "transition:create-shipment",
+            "transition:reconcile-payment",
+            "transition:release-inventory"
+          ],
+          "selector": null,
+          "commitment": null,
+          "start_policy": "aicore.composition/0.1:dependency-ready",
+          "join_policy": null,
+          "cancellation_policy": "aicore.composition/0.1:reconcile-effectful-child",
+          "synchronization": [],
+          "retry_policy": {
+            "transition_id": "transition:reconcile-payment",
+            "retryable_completion_classes": [
+              "INDETERMINATE"
+            ],
+            "maximum_attempts": {
+              "literal_type": "core:integer",
+              "value": "3"
+            },
+            "deadline": null,
+            "backoff_policy": "aicore.composition/0.1:bounded-exponential",
+            "intent_identity": "state:payment#intent_id",
+            "attempt_identity_rule": "aicore.composition/0.1:distinct-invocation-id",
+            "idempotency_strategy": "aicore.composition/0.1:read-only-reconciliation",
+            "indeterminate_outcome_policy": "aicore.composition/0.1:retry-then-defer",
+            "capability_recheck": true,
+            "evidence_recheck": true,
+            "terminal_route": "edge:reconcile-indeterminate-to-parent-indeterminate"
+          },
+          "compensation_edges": [
+            "edge:release-succeeded-to-parent-compensated"
+          ],
+          "capability_delegation": [
+            {
+              "child_id": "transition:capture-payment",
+              "capabilities": [
+                "capability:payment-capture"
+              ]
+            },
+            {
+              "child_id": "transition:create-shipment",
+              "capabilities": [
+                "capability:shipping-create"
+              ]
+            },
+            {
+              "child_id": "transition:reconcile-payment",
+              "capabilities": [
+                "capability:payment-read"
+              ]
+            },
+            {
+              "child_id": "transition:release-inventory",
+              "capabilities": [
+                "capability:inventory-release"
+              ]
+            }
+          ],
+          "assurance_policy": "aicore.knowledge/0.1:external-effect",
+          "lifetime_scope": "aicore.composition/0.1:structured",
+          "observation_boundary": "program:order-fulfillment#public-effects"
+        },
+        "extensions": {}
+      },
+      {
+        "node_id": "transition:reconcile-payment",
+        "kernel_kind": "transition",
+        "form": "action",
+        "contract": {
+          "inputs": [
+            {
+              "port_id": "payment",
+              "type_id": "type:payment",
+              "required": true
+            }
+          ],
+          "outputs": [],
+          "preconditions": [],
+          "outcomes": [
+            {
+              "outcome_id": "captured",
+              "type_id": "type:receipt",
+              "postconditions": [],
+              "effect_summary": [
+                "effect:payment-read"
+              ],
+              "evidence_obligations": [
+                "constraint:accepted-payment-receipt"
+              ]
+            },
+            {
+              "outcome_id": "not-captured",
+              "type_id": "core:reason",
+              "postconditions": [],
+              "effect_summary": [
+                "effect:payment-read"
+              ],
+              "evidence_obligations": [
+                "evidence:authoritative-no-capture"
+              ]
+            }
+          ],
+          "postconditions": [],
+          "effects": [
+            {
+              "effect_id": "effect:payment-read",
+              "kind": "invoke",
+              "resource": "payment-gateway:read",
+              "mode": "read"
+            }
+          ],
+          "required_capabilities": [
+            "capability:payment-read"
+          ],
+          "preserved_constraints": [
+            "constraint:at-most-one-capture",
+            "constraint:charge-creates-obligation"
+          ],
+          "evidence_obligations": [
+            "evidence:correlated-payment-intent"
+          ]
+        },
+        "composition": null,
+        "extensions": {}
+      },
+      {
+        "node_id": "transition:release-inventory",
+        "kernel_kind": "transition",
+        "form": "action",
+        "contract": {
+          "inputs": [
+            {
+              "port_id": "reservation",
+              "type_id": "type:inventory-reservation",
+              "required": true
+            }
+          ],
+          "outputs": [],
+          "preconditions": [],
+          "outcomes": [
+            {
+              "outcome_id": "released",
+              "type_id": "type:inventory-reservation",
+              "postconditions": [],
+              "effect_summary": [
+                "effect:inventory-release"
+              ],
+              "evidence_obligations": [
+                "evidence:inventory-release-receipt"
+              ]
+            }
+          ],
+          "postconditions": [],
+          "effects": [
+            {
+              "effect_id": "effect:inventory-release",
+              "kind": "invoke",
+              "resource": "inventory:release",
+              "mode": "write"
+            }
+          ],
+          "required_capabilities": [
+            "capability:inventory-release"
+          ],
+          "preserved_constraints": [],
+          "evidence_obligations": [
+            "evidence:inventory-release-receipt"
+          ]
+        },
+        "composition": null,
+        "extensions": {}
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge:capture-cancelled-to-reconcile",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:capture-payment",
+          "port_id": "completion:CANCELLED",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "invoke",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:capture-failed-to-reconcile",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:capture-payment",
+          "port_id": "completion:FAILED",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "invoke",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:capture-indeterminate-to-reconcile",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:capture-payment",
+          "port_id": "completion:INDETERMINATE",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "invoke",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:capture-not-captured-to-release",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:capture-payment",
+          "port_id": "outcome:not-captured",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:release-inventory",
+          "port_id": "invoke",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [
+          "evidence:authoritative-no-capture"
+        ],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:capture-succeeded-to-shipment",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:capture-payment",
+          "port_id": "outcome:captured",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:create-shipment",
+          "port_id": "invoke",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [
+          "constraint:accepted-payment-receipt"
+        ],
+        "evidence_obligations": [
+          "constraint:accepted-payment-receipt"
+        ],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:create-cancelled-to-parent-indeterminate",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:create-shipment",
+          "port_id": "completion:CANCELLED",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "return:INDETERMINATE",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:create-failed-to-parent-indeterminate",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:create-shipment",
+          "port_id": "completion:FAILED",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "return:INDETERMINATE",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:create-indeterminate-to-parent-indeterminate",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:create-shipment",
+          "port_id": "completion:INDETERMINATE",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "return:INDETERMINATE",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:create-succeeded-to-parent-completed",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:create-shipment",
+          "port_id": "outcome:created",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "outcome:completed",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [
+          "constraint:charge-creates-obligation"
+        ],
+        "evidence_obligations": [
+          "evidence:shipment-receipt"
+        ],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:entry-to-capture",
+        "kind": "control",
+        "from": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "invoke",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:capture-payment",
+          "port_id": "invoke",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:reconcile-cancelled-to-parent-indeterminate",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "completion:CANCELLED",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "return:INDETERMINATE",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:reconcile-failed-to-parent-indeterminate",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "completion:FAILED",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "return:INDETERMINATE",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:reconcile-indeterminate-retry",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "completion:INDETERMINATE",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "invoke",
+          "path": []
+        },
+        "condition": {
+          "expr": "apply",
+          "operator": "aicore.composition/0.1:retry-budget-remaining",
+          "arguments": [
+            {
+              "expr": "literal",
+              "literal_type": "core:string",
+              "value": "transition:reconcile-payment"
+            }
+          ],
+          "result_type": "core:boolean"
+        },
+        "constraints": [],
+        "evidence_obligations": [
+          "evidence:correlated-payment-intent"
+        ],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:reconcile-indeterminate-to-parent-indeterminate",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "completion:INDETERMINATE",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "return:INDETERMINATE",
+          "path": []
+        },
+        "condition": {
+          "expr": "apply",
+          "operator": "core:not",
+          "arguments": [
+            {
+              "expr": "apply",
+              "operator": "aicore.composition/0.1:retry-budget-remaining",
+              "arguments": [
+                {
+                  "expr": "literal",
+                  "literal_type": "core:string",
+                  "value": "transition:reconcile-payment"
+                }
+              ],
+              "result_type": "core:boolean"
+            }
+          ],
+          "result_type": "core:boolean"
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:reconcile-not-captured-to-release",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "outcome:not-captured",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:release-inventory",
+          "port_id": "invoke",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [
+          "evidence:authoritative-no-capture"
+        ],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:reconcile-succeeded-to-shipment",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:reconcile-payment",
+          "port_id": "outcome:captured",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:create-shipment",
+          "port_id": "invoke",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [
+          "constraint:accepted-payment-receipt"
+        ],
+        "evidence_obligations": [
+          "constraint:accepted-payment-receipt"
+        ],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:release-cancelled-to-parent-indeterminate",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:release-inventory",
+          "port_id": "completion:CANCELLED",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "return:INDETERMINATE",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:release-failed-to-parent-indeterminate",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:release-inventory",
+          "port_id": "completion:FAILED",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "return:INDETERMINATE",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:release-indeterminate-to-parent-indeterminate",
+        "kind": "route",
+        "from": {
+          "node_id": "transition:release-inventory",
+          "port_id": "completion:INDETERMINATE",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "return:INDETERMINATE",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [],
+        "extensions": {}
+      },
+      {
+        "edge_id": "edge:release-succeeded-to-parent-compensated",
+        "kind": "compensation",
+        "from": {
+          "node_id": "transition:release-inventory",
+          "port_id": "outcome:released",
+          "path": []
+        },
+        "to": {
+          "node_id": "transition:fulfill-order",
+          "port_id": "outcome:compensated",
+          "path": []
+        },
+        "condition": {
+          "expr": "literal",
+          "literal_type": "core:boolean",
+          "value": true
+        },
+        "constraints": [],
+        "evidence_obligations": [
+          "evidence:inventory-release-receipt"
+        ],
+        "extensions": {}
+      }
+    ],
+    "entrypoints": [
+      {
+        "entrypoint_id": "entrypoint:fulfill-order",
+        "node_id": "transition:fulfill-order"
+      }
+    ],
+    "exports": [
+      {
+        "export_id": "export:fulfill-order-v1",
+        "root_node_id": "transition:fulfill-order",
+        "public_inputs": [
+          "order",
+          "payment",
+          "reservation"
+        ],
+        "public_outcomes": [
+          "compensated",
+          "completed"
+        ],
+        "public_effects": [
+          "effect:inventory-release",
+          "effect:payment-capture",
+          "effect:payment-read",
+          "effect:shipment-create"
+        ],
+        "required_capabilities": [
+          "capability:inventory-release",
+          "capability:payment-capture",
+          "capability:payment-read",
+          "capability:shipping-create"
+        ],
+        "hard_constraints": [
+          "constraint:at-most-one-capture",
+          "constraint:charge-creates-obligation",
+          "constraint:no-shipment-with-unknown-payment"
+        ],
+        "evidence_obligations": [
+          "constraint:accepted-payment-receipt"
+        ],
+        "observation_boundary": "program:order-fulfillment#public-effects",
+        "version": "1"
+      }
+    ],
+    "extensions": {}
+  },
+  "annotations": {
+    "labels": [
+      {
+        "subject_id": "transition:fulfill-order",
+        "language": "en",
+        "display_name": "Fulfill Order",
+        "description": "Payment-reconciliation slice of the order fulfillment validation case.",
+        "tags": [
+          "rfc-0004",
+          "validation-vector"
+        ]
+      }
+    ],
+    "source_map": [
+      {
+        "subject_id": "transition:fulfill-order",
+        "source_ref": "order-fulfillment.aicore#FulfillOrder"
+      }
+    ],
+    "provenance_refs": [],
+    "extensions": {}
+  }
+}
