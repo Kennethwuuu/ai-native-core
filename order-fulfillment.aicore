@@ -1,0 +1,475 @@
+# Provisional human projection for the RFC-0003 composition validation case.
+# This file is semantic design input, not executable source.
+# Route suffixes such as Transition.indeterminate denote Completion Views.
+# Constructors such as PaymentCapture.unknown denote domain State.
+
+data Order
+  id: OrderId
+  subtotal: Money
+  total: Money?
+  status: pending | confirmed | cancelled | manual_resolution
+
+data Pricing
+  order_id: OrderId
+  tax: Money?
+  shipping_quote: Money?
+  status: incomplete | complete
+
+data InventoryReservation
+  order_id: OrderId
+  reservation_id: ReservationId
+  status: absent | held | committed | released | unknown
+
+data PaymentCapture
+  order_id: OrderId
+  intent_id: PaymentIntentId
+  invocation_id: InvocationId
+  idempotency_key: IdempotencyKey
+  amount: Money
+  status: prepared | succeeded | failed | refunded | unknown
+  receipt: Receipt?
+
+data Shipment
+  order_id: OrderId
+  shipment_id: ShipmentId
+  status: absent | created | cancelled | unknown
+
+data Fulfillment
+  order_id: OrderId
+  status:
+    pending
+    | completed
+    | failed_without_external_commitment
+    | cancelled
+    | compensated
+    | partially_compensated
+    | indeterminate
+    | manual_resolution
+
+assurance PaymentReceiptAcceptedV1
+  subject
+    PaymentCapture
+
+  requires
+    Receipt.intent_id == PaymentCapture.intent_id
+    Receipt.amount == PaymentCapture.amount
+    Receipt.gateway in approved_gateways
+    Receipt.signature valid_under approved_keyset
+    Receipt not_revoked
+
+rule PositiveOrderTotal state
+  Order.total is known
+    => Order.total > 0
+
+rule PricingComplete state
+  Pricing.status == complete
+    => Pricing.tax is known
+       and Pricing.shipping_quote is known
+
+rule AtMostOneCapture trace
+  successful_capture(Order.id) <= 1
+
+rule NoShipmentWithUnknownPayment trace
+  PaymentCapture.status == unknown
+    => CreateShipment disabled
+
+rule ConfirmedRequiresFulfillment state
+  Order.status == confirmed
+    => InventoryReservation.status == held
+       and PaymentCapture.status == succeeded
+       and PaymentCapture.receipt accepted_by PaymentReceiptAcceptedV1
+       and Shipment.status == created
+
+rule ChargeCreatesObligation trace
+  PaymentCapture.status == succeeded
+    => eventually Order.status == confirmed
+       or PaymentCapture.status == refunded
+       or Fulfillment.status == manual_resolution
+
+transform ValidateOrder
+  in
+    Order.pending
+    Order.subtotal
+
+  out
+    ValidOrder
+
+  requires
+    Order.subtotal > 0
+
+  effects
+    none
+
+action CalculateTax
+  in
+    ValidOrder
+
+  outcomes
+    Tax.succeeded(Money)
+    Tax.failed(Reason)
+    Tax.indeterminate(ObservationGap)
+
+  effects
+    TaxService.quote
+
+  capabilities
+    tax.quote
+
+action FetchShippingQuote
+  in
+    ValidOrder
+
+  outcomes
+    ShippingQuote.succeeded(Money)
+    ShippingQuote.failed(Reason)
+    ShippingQuote.indeterminate(ObservationGap)
+
+  effects
+    ShippingCarrier.quote
+
+  capabilities
+    shipping.quote
+
+retry ShippingQuoteRetry
+  transition
+    FetchShippingQuote
+
+  on
+    transient_failure
+
+  attempts
+    at_most 3
+
+  deadline
+    QuoteDeadline
+
+  prohibits
+    retry after indeterminate outcome without reconciliation
+
+  safety
+    duplicate quote requests acceptable within QuoteBudget
+    stable quote intent with distinct invocation identities
+
+parallel PricingInputs
+  children
+    CalculateTax
+    ShippingQuoteRetry
+
+  start
+    all_when_ready
+
+  join
+    all_success
+
+  on_child_failure
+    cancel_remaining
+    wait_all
+    parent failed
+
+  on_child_cancelled
+    cancel_remaining
+    wait_all
+    parent cancelled
+
+  on_child_indeterminate
+    cancel_remaining
+    wait_all
+    parent indeterminate
+
+  interference
+    effects disjoint
+    outputs merged into Pricing
+
+transform FinalizePricing
+  in
+    Order.subtotal
+    Tax.succeeded(Money)
+    ShippingQuote.succeeded(Money)
+
+  out
+    Order.total
+    Pricing.complete
+
+  requires
+    Order.subtotal > 0
+    Tax.value >= 0
+    ShippingQuote.value >= 0
+
+  effects
+    none
+
+  establishes
+    PositiveOrderTotal
+    PricingComplete
+
+action ReserveInventory
+  in
+    ValidOrder
+    Pricing.complete
+
+  outcomes
+    InventoryReservation.held(ReservationId)
+    InventoryReservation.failed(Reason)
+    InventoryReservation.unknown(ReservationId)
+
+  effects
+    Inventory.reserve
+
+  capabilities
+    inventory.reserve
+
+action CapturePayment
+  in
+    InventoryReservation.held
+    Order.total
+
+  outcomes
+    PaymentCapture.succeeded(Receipt)
+    PaymentCapture.failed(Reason)
+    PaymentCapture.unknown(PaymentIntentId)
+
+  requires
+    Order.total > 0
+    PaymentCapture.idempotency_key.present
+
+  effects
+    PaymentGateway.capture
+
+  capabilities
+    payment.capture
+
+  preserves
+    AtMostOneCapture
+
+  creates_obligation
+    ChargeCreatesObligation on PaymentCapture.succeeded
+
+action ReconcilePayment
+  in
+    PaymentCapture.unknown
+
+  outcomes
+    PaymentCapture.succeeded(Receipt)
+    PaymentCapture.failed(Reason)
+    PaymentCapture.unknown(PaymentIntentId)
+
+  effects
+    PaymentGateway.read
+
+  capabilities
+    payment.read
+
+action CreateShipment
+  in
+    InventoryReservation.held
+    PaymentCapture.succeeded(Receipt)
+
+  outcomes
+    Shipment.created(ShipmentId)
+    Shipment.failed(Reason)
+    Shipment.unknown(ShipmentId)
+
+  requires
+    Receipt accepted_by PaymentReceiptAcceptedV1
+
+  effects
+    ShippingCarrier.create
+
+  capabilities
+    shipping.create
+
+  preserves
+    NoShipmentWithUnknownPayment
+
+action ConfirmOrder
+  in
+    InventoryReservation.held
+    PaymentCapture.succeeded(Receipt)
+    Shipment.created
+
+  outcomes
+    Order.confirmed
+    Fulfillment.completed
+    Order.confirmation_rejected(Reason)
+    Order.confirmation_unknown(ObservationGap)
+
+  effects
+    Order.write
+
+  capabilities
+    order.write
+
+  preserves
+    ConfirmedRequiresFulfillment
+    ChargeCreatesObligation
+
+action ReleaseInventory
+  compensates
+    ReserveInventory
+
+  in
+    InventoryReservation.held
+
+  outcomes
+    InventoryReservation.released
+    compensation_failed(Reason)
+    compensation_indeterminate(ObservationGap)
+
+  restores
+    no held inventory obligation for Order.id
+
+  effects
+    Inventory.release
+
+  capabilities
+    inventory.release
+
+action RefundPayment
+  compensates
+    CapturePayment
+
+  in
+    PaymentCapture.succeeded(Receipt)
+
+  outcomes
+    PaymentCapture.refunded(RefundReceipt)
+    compensation_failed(Reason)
+    compensation_indeterminate(ObservationGap)
+
+  requires
+    Receipt accepted_by PaymentReceiptAcceptedV1
+
+  restores
+    no captured-payment obligation for Order.id
+
+  effects
+    PaymentGateway.refund
+
+  capabilities
+    payment.refund
+
+action CancelShipment
+  compensates
+    CreateShipment
+
+  in
+    Shipment.created
+
+  outcomes
+    Shipment.cancelled
+    compensation_failed(Reason)
+    compensation_indeterminate(ObservationGap)
+
+  restores
+    no active-shipment obligation for Order.id
+
+  effects
+    ShippingCarrier.cancel
+
+  capabilities
+    shipping.cancel
+
+saga FulfillOrder
+  forward
+    ValidateOrder
+    >> PricingInputs
+    >> FinalizePricing
+    >> ReserveInventory
+    >> CapturePayment
+    >> CreateShipment
+    >> ConfirmOrder
+
+  subroute ReconcileCapture
+    ReconcilePayment
+    on succeeded with accepted PaymentReceipt
+      -> resume at CreateShipment
+    on failed with authoritative no-capture evidence
+      -> ReleaseInventory -> finish compensated
+    on indeterminate -> finish indeterminate
+    on cancelled -> finish manual_resolution
+
+  routes
+    on PricingInputs.failed
+      finish failed_without_external_commitment
+
+    on PricingInputs.indeterminate
+      finish indeterminate
+
+    on ReserveInventory.failed
+      when evidence proves no reservation held
+        -> finish failed_without_external_commitment
+      otherwise -> finish manual_resolution
+
+    on ReserveInventory.indeterminate
+      finish manual_resolution
+
+    on CapturePayment.failed
+      when evidence proves no capture occurred
+        -> ReleaseInventory -> finish compensated
+      otherwise
+        -> mark PaymentCapture.unknown
+        -> ReconcileCapture
+
+    on CapturePayment.indeterminate
+      ReconcileCapture
+
+    on CreateShipment.failed
+      when evidence proves no active shipment
+        -> RefundPayment
+        >> ReleaseInventory
+        -> finish compensated
+      otherwise -> finish manual_resolution
+
+    on CreateShipment.indeterminate
+      finish manual_resolution
+
+    on ConfirmOrder.failed
+      when evidence proves no confirmation write
+        -> CancelShipment
+        >> RefundPayment
+        >> ReleaseInventory
+        -> finish compensated
+      otherwise -> finish manual_resolution
+
+    on ConfirmOrder.indeterminate
+      finish manual_resolution
+
+    on any forward.cancelled
+      compensate known completed forward effects
+        in reverse causal order
+      on no outstanding obligation -> finish cancelled
+      on unknown effect -> finish manual_resolution
+
+    on any compensation_failed
+      finish partially_compensated
+
+    on any compensation_indeterminate
+      finish manual_resolution
+
+    on any compensation.cancelled
+      finish manual_resolution
+
+  compensate
+    CancelShipment compensates CreateShipment
+    RefundPayment compensates CapturePayment
+    ReleaseInventory compensates ReserveInventory
+
+  compensation_order
+    reverse causal dependencies
+
+  terminal
+    completed
+    failed_without_external_commitment
+    cancelled
+    compensated
+    partially_compensated
+    indeterminate
+    manual_resolution
+
+  preserves
+    PositiveOrderTotal
+    PricingComplete
+    AtMostOneCapture
+    NoShipmentWithUnknownPayment
+    ConfirmedRequiresFulfillment
+    ChargeCreatesObligation
