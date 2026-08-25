@@ -1,0 +1,130 @@
+# Provisional human projection for the RFC-0001 payment validation case.
+# This file is semantic design input, not yet executable source.
+
+data Order
+  id: OrderId
+  total: Money
+  status: pending | paid | cancelled
+
+data PaymentAttempt
+  order_id: OrderId
+  attempt_id: AttemptId
+  idempotency_key: IdempotencyKey
+  amount: Money
+  status: prepared | submitted | succeeded | declined | unknown
+  receipt: Receipt?
+
+rule PositiveAmount state
+  PaymentAttempt.amount > 0
+
+rule StableChargeIntent trace
+  one PaymentAttempt keeps one amount and one idempotency_key
+
+rule AtMostOneSuccessfulCharge trace
+  successful_charge(Order.id) <= 1
+
+rule NoNewAttemptWhileUnknown trace
+  exists PaymentAttempt(Order.id, status = unknown)
+    => no new PaymentAttempt for Order.id
+
+rule PaidRequiresReceipt state
+  Order.status == paid
+    => exists verified Receipt for Order.id
+
+transform PrepareCharge
+  in
+    Order.pending
+    Order.total
+
+  out
+    PaymentAttempt.prepared
+
+  requires
+    Order.total > 0
+
+  effects
+    none
+
+  preserves
+    PositiveAmount
+    StableChargeIntent
+
+action SubmitCharge
+  in
+    Order.pending
+    PaymentAttempt.prepared
+
+  outcomes
+    PaymentAttempt.succeeded(Receipt)
+    PaymentAttempt.declined(Reason)
+    PaymentAttempt.unknown(AttemptId)
+
+  requires
+    PaymentAttempt.amount > 0
+    PaymentAttempt.idempotency_key.present
+
+  effects
+    PaymentGateway.charge
+
+  capabilities
+    payment.charge
+
+  preserves
+    AtMostOneSuccessfulCharge
+
+  evidence
+    gateway_response | timeout_observation
+
+action ReconcileCharge
+  in
+    PaymentAttempt.unknown
+
+  outcomes
+    PaymentAttempt.succeeded(Receipt)
+    PaymentAttempt.declined(Reason)
+    PaymentAttempt.unknown(AttemptId)
+
+  effects
+    PaymentGateway.read
+
+  capabilities
+    payment.read
+
+  preserves
+    AtMostOneSuccessfulCharge
+    NoNewAttemptWhileUnknown
+
+  evidence
+    reconciliation_record
+
+action MarkPaid
+  in
+    Order.pending
+    PaymentAttempt.succeeded(Receipt)
+
+  out
+    Order.paid
+
+  requires
+    Receipt.verified
+
+  effects
+    Order.write
+
+  capabilities
+    order.write
+
+  preserves
+    PaidRequiresReceipt
+    AtMostOneSuccessfulCharge
+
+goal Paid
+  eventually Order.status == paid
+
+flow PayOrder =
+  PrepareCharge
+  >> SubmitCharge
+  >> (
+       when PaymentAttempt.succeeded -> MarkPaid
+       | when PaymentAttempt.unknown -> ReconcileCharge
+     )
