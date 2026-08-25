@@ -1,0 +1,164 @@
+{
+  "profile": "aicore.constraint-core/0.1",
+  "description": "Normative four-valued information and Constraint Core vectors for RFC-0006.",
+  "order": [
+    "UNKNOWN",
+    "SUPPORTED_TRUE",
+    "SUPPORTED_FALSE",
+    "CONFLICTING"
+  ],
+  "values": {
+    "UNKNOWN": [0, 0],
+    "SUPPORTED_TRUE": [1, 0],
+    "SUPPORTED_FALSE": [0, 1],
+    "CONFLICTING": [1, 1]
+  },
+  "designated_for_fde_consequence": [
+    "SUPPORTED_TRUE",
+    "CONFLICTING"
+  ],
+  "strict_hard_constraint_acceptance": [
+    "SATISFIED"
+  ],
+  "orders": {
+    "information_cover_relations": [
+      ["UNKNOWN", "SUPPORTED_TRUE"],
+      ["UNKNOWN", "SUPPORTED_FALSE"],
+      ["SUPPORTED_TRUE", "CONFLICTING"],
+      ["SUPPORTED_FALSE", "CONFLICTING"]
+    ],
+    "truth_cover_relations": [
+      ["SUPPORTED_FALSE", "UNKNOWN"],
+      ["SUPPORTED_FALSE", "CONFLICTING"],
+      ["UNKNOWN", "SUPPORTED_TRUE"],
+      ["CONFLICTING", "SUPPORTED_TRUE"]
+    ]
+  },
+  "unary": {
+    "not": {
+      "UNKNOWN": "UNKNOWN",
+      "SUPPORTED_TRUE": "SUPPORTED_FALSE",
+      "SUPPORTED_FALSE": "SUPPORTED_TRUE",
+      "CONFLICTING": "CONFLICTING"
+    }
+  },
+  "binary": {
+    "and": {
+      "UNKNOWN": ["UNKNOWN", "UNKNOWN", "SUPPORTED_FALSE", "SUPPORTED_FALSE"],
+      "SUPPORTED_TRUE": ["UNKNOWN", "SUPPORTED_TRUE", "SUPPORTED_FALSE", "CONFLICTING"],
+      "SUPPORTED_FALSE": ["SUPPORTED_FALSE", "SUPPORTED_FALSE", "SUPPORTED_FALSE", "SUPPORTED_FALSE"],
+      "CONFLICTING": ["SUPPORTED_FALSE", "CONFLICTING", "SUPPORTED_FALSE", "CONFLICTING"]
+    },
+    "or": {
+      "UNKNOWN": ["UNKNOWN", "SUPPORTED_TRUE", "UNKNOWN", "SUPPORTED_TRUE"],
+      "SUPPORTED_TRUE": ["SUPPORTED_TRUE", "SUPPORTED_TRUE", "SUPPORTED_TRUE", "SUPPORTED_TRUE"],
+      "SUPPORTED_FALSE": ["UNKNOWN", "SUPPORTED_TRUE", "SUPPORTED_FALSE", "CONFLICTING"],
+      "CONFLICTING": ["SUPPORTED_TRUE", "SUPPORTED_TRUE", "CONFLICTING", "CONFLICTING"]
+    },
+    "information_meet": {
+      "UNKNOWN": ["UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN"],
+      "SUPPORTED_TRUE": ["UNKNOWN", "SUPPORTED_TRUE", "UNKNOWN", "SUPPORTED_TRUE"],
+      "SUPPORTED_FALSE": ["UNKNOWN", "UNKNOWN", "SUPPORTED_FALSE", "SUPPORTED_FALSE"],
+      "CONFLICTING": ["UNKNOWN", "SUPPORTED_TRUE", "SUPPORTED_FALSE", "CONFLICTING"]
+    },
+    "information_join": {
+      "UNKNOWN": ["UNKNOWN", "SUPPORTED_TRUE", "SUPPORTED_FALSE", "CONFLICTING"],
+      "SUPPORTED_TRUE": ["SUPPORTED_TRUE", "SUPPORTED_TRUE", "CONFLICTING", "CONFLICTING"],
+      "SUPPORTED_FALSE": ["SUPPORTED_FALSE", "CONFLICTING", "SUPPORTED_FALSE", "CONFLICTING"],
+      "CONFLICTING": ["CONFLICTING", "CONFLICTING", "CONFLICTING", "CONFLICTING"]
+    }
+  },
+  "atomic_status": {
+    "UNKNOWN": "UNKNOWN",
+    "SUPPORTED_TRUE": "SATISFIED",
+    "SUPPORTED_FALSE": "VIOLATED",
+    "CONFLICTING": "CONFLICTING"
+  },
+  "strict_status_order": [
+    "UNKNOWN",
+    "SATISFIED",
+    "VIOLATED",
+    "CONFLICTING"
+  ],
+  "strict_unary": {
+    "not": {
+      "UNKNOWN": "UNKNOWN",
+      "SATISFIED": "VIOLATED",
+      "VIOLATED": "SATISFIED",
+      "CONFLICTING": "CONFLICTING"
+    }
+  },
+  "strict_binary": {
+    "all": {
+      "UNKNOWN": ["UNKNOWN", "UNKNOWN", "VIOLATED", "CONFLICTING"],
+      "SATISFIED": ["UNKNOWN", "SATISFIED", "VIOLATED", "CONFLICTING"],
+      "VIOLATED": ["VIOLATED", "VIOLATED", "VIOLATED", "VIOLATED"],
+      "CONFLICTING": ["CONFLICTING", "CONFLICTING", "VIOLATED", "CONFLICTING"]
+    },
+    "any": {
+      "UNKNOWN": ["UNKNOWN", "SATISFIED", "UNKNOWN", "CONFLICTING"],
+      "SATISFIED": ["SATISFIED", "SATISFIED", "SATISFIED", "SATISFIED"],
+      "VIOLATED": ["UNKNOWN", "SATISFIED", "VIOLATED", "CONFLICTING"],
+      "CONFLICTING": ["CONFLICTING", "SATISFIED", "CONFLICTING", "CONFLICTING"]
+    }
+  },
+  "when_require": {
+    "requirement_order": [
+      "UNKNOWN",
+      "SATISFIED",
+      "VIOLATED",
+      "CONFLICTING"
+    ],
+    "activation_rows": {
+      "UNKNOWN": ["UNKNOWN", "SATISFIED", "UNKNOWN", "UNKNOWN"],
+      "SATISFIED": ["UNKNOWN", "SATISFIED", "VIOLATED", "CONFLICTING"],
+      "VIOLATED": ["SATISFIED", "SATISFIED", "SATISFIED", "SATISFIED"],
+      "CONFLICTING": ["CONFLICTING", "SATISFIED", "CONFLICTING", "CONFLICTING"]
+    }
+  },
+  "default_effectful_gate": {
+    "constraint_status": {
+      "SATISFIED": "CONTINUE",
+      "VIOLATED": "DENY",
+      "UNKNOWN": "DEFER",
+      "CONFLICTING": "DEFER"
+    },
+    "evaluation_completion": {
+      "COMPLETE": "USE_CONSTRAINT_STATUS",
+      "INVALID": "DENY",
+      "INDETERMINATE": "DEFER",
+      "INCOMPLETE_CONTEXT": "DEFER"
+    }
+  },
+  "variadic_identities": {
+    "information_all_empty": "SUPPORTED_TRUE",
+    "information_any_empty": "SUPPORTED_FALSE",
+    "strict_all_empty": "SATISFIED",
+    "strict_any_empty": "VIOLATED"
+  },
+  "required_properties": [
+    "negation_involution",
+    "negation_truth_order_reversal",
+    "negation_information_order_preservation",
+    "truth_lattice_commutativity",
+    "truth_lattice_associativity",
+    "truth_lattice_idempotence",
+    "truth_lattice_absorption",
+    "truth_lattice_distributivity",
+    "de_morgan",
+    "information_lattice_commutativity",
+    "information_lattice_associativity",
+    "information_lattice_idempotence",
+    "information_lattice_absorption",
+    "information_lattice_distributivity",
+    "bilattice_interlacing",
+    "strict_status_negation_involution",
+    "strict_status_commutativity",
+    "strict_status_associativity",
+    "strict_status_de_morgan",
+    "strict_status_decisive_witness",
+    "strict_status_conflict_preservation",
+    "non_explosion_counterexample",
+    "excluded_middle_counterexample"
+  ]
+}
