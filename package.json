@@ -1,0 +1,12 @@
+{
+  "name": "ai-native-core",
+  "version": "0.1.0-experimental",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node verify-four-valued-constraints.mjs && python3 tools/logic_oracle.py && node --test test/*.test.mjs",
+    "evaluate": "node bin/aicore.mjs evaluate",
+    "test:logic": "node verify-four-valued-constraints.mjs && python3 tools/logic_oracle.py"
+  }
+}

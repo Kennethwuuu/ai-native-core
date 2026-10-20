@@ -1,23 +1,37 @@
 # Roadmap
 
-## Phase 0 — Semantic core
+## Phase 0 — Semantic hypotheses (drafts available)
 
 - Stabilize terminology.
-- Challenge the four-primitive hypothesis.
+- Challenge the three-concept State / Transition / Constraint hypothesis.
 - Define precise action composition semantics.
 - Define effects and capabilities.
 - Decide canonical IR requirements.
 
-## Phase 1 — Reference parser and IR
+RFC-0001 through RFC-0006 are research drafts, not a stabilized standard. The
+Phase 0 retrospective remains a design constraint: avoid turning every audit
+detail into mandatory AI context.
 
-- Parse the minimal human syntax.
-- Produce canonical typed IR.
-- Provide deterministic formatting and serialization.
-- Add machine-readable diagnostics.
+## Phase 1 — Executable semantic experiments (in progress)
+
+- [x] Restore the standalone four-valued conformance checker.
+- [x] Add a fixed typed predicate vocabulary and bounded pure evaluator.
+- [x] Evaluate `require`, `forbid`, and guarded requirements as JSON.
+- [x] Separate information value, strict status, completion, and gate contribution.
+- [x] Compare the logical layer against an independent Python implementation.
+- [x] Add machine-readable diagnostics and CI for the reference subset.
+- [ ] Add typed, immutable, content-identified finite closed-domain quantification.
+- [ ] Extend independent language coverage to type and evidence boundaries.
+- [ ] Define and test evidence eligibility inputs and content identity bindings.
+- [ ] Experiment with compact projection, deterministic expansion, and identity verification.
+- [ ] Measure representation size, context cost, and correctness before freezing a wire format.
+
+A human-syntax parser follows evidence that the typed representation is useful.
+A general executor is not the current milestone.
 
 ## Phase 2 — Verifier
 
-- Type checking.
+- Extend the reference subset's type checks to graph and transition contracts.
 - Effect checking.
 - Rule/invariant checking.
 - Semantic dependency graph.
