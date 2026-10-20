@@ -196,6 +196,21 @@ every member binding across all nested quantifiers. The two domain-related
 limits apply only to `0.2`. Exceeding any limit produces `INDETERMINATE`, never
 a partial truth value.
 
+Evaluator implementation `aicore.js-reference/0.2.1` adds fixed diagnostic
+ceilings for both accepted language profiles: at most 10,000 copied support-ID
+references and 4 MiB of compact UTF-8 result JSON. These are reported in
+`diagnostic_limits`, separate from the request's configurable AST limits.
+Copies are counted before materialization, and the complete encoded size is
+checked incrementally before serialization. Evaluation JSON from the CLI is
+compact; the terminating newline is outside the byte count.
+
+Exhausting a diagnostic budget returns `DIAGNOSTIC_LIMIT` and no partial
+`constraint_status`. Oversized diagnostic arrays or failure metadata may be
+omitted explicitly. If a pre-existing `INVALID` failure needs that fallback,
+its completion and `DENY` contribution remain intact and its code is retained
+as `cause_code`. These ceilings do not replace caller-owned API input-size or
+process CPU/memory limits.
+
 The CLI accepts at most 1 MiB of valid UTF-8, at most 160 JSON container levels,
 and at most 50,000 JSON values. It rejects duplicate object keys (including
 escaped spellings), unpaired Unicode surrogates, trailing input, and unknown
@@ -225,6 +240,9 @@ input-size limits and must not pass arbitrary host objects or accessors.
 5. Another 384 quantified constraints, plus domain identity vectors computed
    independently in Python and JS, and boundary tests for closure, scope,
    lexical bindings, empty-domain typing, and resource limits.
+6. Exhaustive transformations over 341 bounded assignments, 4,124 JSON input
+   comparisons with an independent Python native decoder, 256 generated domain
+   identities, and regressions for diagnostic expansion and exact budgets.
 
 The Python oracle independently covers logical/guarded denotation, finite
 quantifier folds, and the restricted domain encoding. It does not implement the
@@ -237,3 +255,6 @@ Full evidence eligibility, capability checks, general Program/Block canonical
 content IDs, temporal properties, execution, compact IR, and token or
 correctness benchmarks remain future work. Results are experimental diagnostic
 records, not reusable verification attestations under RFC-0004.
+
+See [the validation report](VALIDATION-2026-10-20.md) for the measured finding,
+test coverage, independent-oracle boundaries, and remaining limitations.

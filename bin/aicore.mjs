@@ -30,7 +30,7 @@ if (args.length === 1 && ["--help", "-h"].includes(args[0])) {
       console.log(JSON.stringify({ domain_id: args[2], content_id, closure_claim_id: closureClaimId(content_id) }, null, 2));
     } else {
       const result = evaluate(request);
-      console.log(JSON.stringify(result, null, 2));
+      console.log(JSON.stringify(result));
       process.exitCode = result.completion === "COMPLETE" ? 0 : result.completion === "INVALID" ? 2 : 3;
     }
   } catch (error) {

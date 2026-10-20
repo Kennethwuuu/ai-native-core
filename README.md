@@ -72,6 +72,9 @@ vocabulary, request format, limits, diagnostics, and cross-language test scope.
 Profile `0.2` adds [finite-domain quantifiers](docs/FINITE-DOMAINS.md): complete
 body type checking, lexical bindings, content-verified domains, and closure
 support tied to each exact domain digest. Profile `0.1` requests still work.
+The [validation report](docs/VALIDATION-2026-10-20.md) records independent and
+adversarial checks, including a fixed diagnostic-expansion defect and its
+resource ceilings.
 
 ## Example
 

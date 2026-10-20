@@ -198,6 +198,10 @@ instantiation even if its body has no atoms. Limits may be lowered, never
 raised. Any exhausted bound returns `INDETERMINATE` without a partial
 `constraint_status`.
 
+The implementation also enforces the shared
+[diagnostic output ceilings](REFERENCE-EVALUATOR.md): repeated closure/atom
+support cannot expand an otherwise bounded request into an unbudgeted result.
+
 The differential corpus adds 384 quantified constraints to the original 576
 logical cases. It includes empty domains, nested bindings, negation, strict
 folds, and guarded requirements. Python independently evaluates the denotation

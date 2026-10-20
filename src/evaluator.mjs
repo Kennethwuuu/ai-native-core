@@ -1,13 +1,14 @@
 import * as logic from "./logic.mjs";
 import { EvaluationError, fail, own, record, text, ids, typed, list } from "./validation.mjs";
 import { domainContentId, closureClaimId, validateDomain, MAX_DOMAIN_MEMBERS } from "./domains.mjs";
+import { assertResultBudget, DIAGNOSTIC_LIMITS } from "./diagnostics.mjs";
 export { EvaluationError } from "./validation.mjs";
 
 export const PROFILE = "aicore.reference-evaluator/0.2";
 export const LEGACY_PROFILE = "aicore.reference-evaluator/0.1";
 export const VOCABULARY_ID = "aicore.reference-vocabulary/0.2";
 export const LEGACY_VOCABULARY_ID = "aicore.reference-vocabulary/0.1";
-export const EVALUATOR_ID = "aicore.js-reference/0.2";
+export const EVALUATOR_ID = "aicore.js-reference/0.2.1";
 const LEGACY_LIMITS = Object.freeze({ max_depth: 64, max_nodes: 5000, max_atoms: 1000 });
 export const DEFAULT_LIMITS = Object.freeze({ ...LEGACY_LIMITS, max_domain_members: MAX_DOMAIN_MEMBERS, max_instantiations: 1000 });
 
@@ -39,10 +40,17 @@ export function contribution(completion, constraintStatus) {
 // Experimental RFC-0006 subset. Inputs are a caller-supplied immutable snapshot
 // and an ALREADY ELIGIBLE support view, not raw or authenticated evidence.
 export function evaluate(request) {
-  const base = { profile: PROFILE, vocabulary_id: VOCABULARY_ID, evaluator_id: EVALUATOR_ID };
+  const base = { profile: PROFILE, vocabulary_id: VOCABULARY_ID, evaluator_id: EVALUATOR_ID, diagnostic_limits: DIAGNOSTIC_LIMITS };
   const observations = [];
   const domainChecks = [];
-  const stats = { nodes: 0, atoms: 0 };
+  const stats = { nodes: 0, atoms: 0, support_references: 0 };
+  function reserveSupport(support, path) {
+    const count = support.positive_support_ids.length + support.negative_support_ids.length;
+    if (stats.support_references + count > DIAGNOSTIC_LIMITS.max_support_references) {
+      fail("DIAGNOSTIC_LIMIT", path, "Diagnostic support-reference budget exhausted", "INDETERMINATE");
+    }
+    stats.support_references += count;
+  }
   try {
     const quantified = request?.profile === PROFILE;
     if (quantified) { stats.validation_nodes = 0; stats.instantiations = 0; }
@@ -162,6 +170,7 @@ export function evaluate(request) {
         if (node.predicate === "claim.supported") {
           text(args[0], `${path}.args[0]`);
           support = own(request.claims, args[0]) ? request.claims[args[0]] : { positive_support_ids: [], negative_support_ids: [] };
+          reserveSupport(support, path);
           information_value = logic.fromSupport(support.positive_support_ids.length > 0, support.negative_support_ids.length > 0);
           observations.push({ path, predicate_id: node.predicate, claim_id: args[0], information_value,
             positive_support_ids: [...support.positive_support_ids].sort(), negative_support_ids: [...support.negative_support_ids].sort(),
@@ -200,6 +209,7 @@ export function evaluate(request) {
         if (checking) {
           const claimId = closureClaimId(domain.content_id);
           const support = own(request.claims, claimId) ? request.claims[claimId] : { positive_support_ids: [], negative_support_ids: [] };
+          reserveSupport(support, path);
           const value = logic.fromSupport(support.positive_support_ids.length > 0, support.negative_support_ids.length > 0);
           domainChecks.push({ path, domain_id: node.domain, content_id: domain.content_id, closure_claim_id: claimId,
             closure_information_value: value, positive_support_ids: [...support.positive_support_ids].sort(), negative_support_ids: [...support.negative_support_ids].sort() });
@@ -245,11 +255,23 @@ export function evaluate(request) {
         information_value: logic.not(expression.information_value), strict_status: constraintStatus,
       };
     }
-    return { ...base, completion: "COMPLETE", constraint_status: constraintStatus,
+    const result = { ...base, completion: "COMPLETE", constraint_status: constraintStatus,
       effectful_gate_contribution: contribution("COMPLETE", constraintStatus), ...details, observations, domain_checks: domainChecks, stats };
+    assertResultBudget(result);
+    return result;
   } catch (error) {
     if (!(error instanceof EvaluationError)) throw error;
-    return { ...base, completion: error.completion, effectful_gate_contribution: contribution(error.completion),
+    if (error.code === "DIAGNOSTIC_LIMIT") { observations.length = 0; domainChecks.length = 0; }
+    const result = { ...base, completion: error.completion, effectful_gate_contribution: contribution(error.completion),
       diagnostics: [{ code: error.code, path: error.path, message: error.message }], observations, domain_checks: domainChecks, stats };
+    try { assertResultBudget(result); return result; }
+    catch (budgetError) {
+      if (!(budgetError instanceof EvaluationError) || budgetError.code !== "DIAGNOSTIC_LIMIT") throw budgetError;
+      // Even failure provenance or a caller-supplied identity may be too large.
+      // Return an explicit incomplete diagnostic, never a truncated attestation.
+      return { profile: base.profile, vocabulary_id: base.vocabulary_id, evaluator_id: EVALUATOR_ID,
+        diagnostic_limits: DIAGNOSTIC_LIMITS, completion: error.completion, effectful_gate_contribution: contribution(error.completion),
+        diagnostics: [{ code: "DIAGNOSTIC_LIMIT", path: "$", cause_code: error.code, message: "Failure payload exceeds diagnostic budget; payload omitted" }], stats };
+    }
   }
 }
