@@ -59,6 +59,7 @@ With Node.js 22+ and Python 3.12+ installed, no package installation is needed:
 ```bash
 npm test
 node bin/aicore.mjs evaluate examples/payment-receipt.request.json
+node bin/aicore.mjs evaluate examples/all-receipts.request.json
 ```
 
 The payment example returns `COMPLETE`, constraint `UNKNOWN`, and gate
@@ -68,6 +69,9 @@ action. Its only gate contributions are `CONTINUE`, `DENY`, and `DEFER`.
 
 See the [reference evaluator guide](docs/REFERENCE-EVALUATOR.md) for the typed
 vocabulary, request format, limits, diagnostics, and cross-language test scope.
+Profile `0.2` adds [finite-domain quantifiers](docs/FINITE-DOMAINS.md): complete
+body type checking, lexical bindings, content-verified domains, and closure
+support tied to each exact domain digest. Profile `0.1` requests still work.
 
 ## Example
 
@@ -135,9 +139,10 @@ Foundations v0.1 document is historical context; later RFCs amend it.
 
 Nothing in this repository should yet be considered stable. The executable
 subset supports state-scoped typed predicates, four-valued expressions, three
-constraint forms, and bounded evaluation. It does not yet implement a full
+constraint forms, finite closed-domain quantifiers, and bounded evaluation. It does not yet implement a full
 verifier, canonicalizer, parser for `.aicore`, or general runtime. Python/JS
-differential agreement currently covers the logical layer only.
+differential agreement covers the logical layer, quantifier denotation, and
+restricted domain identities; evidence eligibility remains caller-supplied.
 
 ## Open questions
 

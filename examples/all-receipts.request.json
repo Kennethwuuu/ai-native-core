@@ -1,0 +1,58 @@
+{
+  "profile": "aicore.reference-evaluator/0.2",
+  "vocabulary_id": "aicore.reference-vocabulary/0.2",
+  "subject_id": "shipment:42",
+  "snapshot_id": "snapshot:shipment-42:v1",
+  "evidence_view_id": "eligible-support:shipment-42:v1",
+  "scope": "state",
+  "context": {
+    "complete": true,
+    "missing_dependencies": []
+  },
+  "bindings": {},
+  "claims": {
+    "domain.closed:aicore-domain-sha256:e937258785bad6dca2cad6466e0bb1818e6fbc848e667ba230cd096b889c92f4": {
+      "positive_support_ids": [
+        "closure:receipt-ledger:42"
+      ],
+      "negative_support_ids": []
+    },
+    "receipt.accepted:attempt-42": {
+      "positive_support_ids": [
+        "receipt:verified:42"
+      ],
+      "negative_support_ids": []
+    }
+  },
+  "domains": {
+    "receipts": {
+      "subject_id": "shipment:42",
+      "snapshot_id": "snapshot:shipment-42:v1",
+      "scope": "state",
+      "element_type": "ClaimId",
+      "members": [
+        "receipt.accepted:attempt-42",
+        "receipt.accepted:attempt-43"
+      ],
+      "content_id": "aicore-domain-sha256:e937258785bad6dca2cad6466e0bb1818e6fbc848e667ba230cd096b889c92f4"
+    }
+  },
+  "constraint": {
+    "id": "AllShipmentReceiptsAccepted",
+    "form": "require",
+    "expr": {
+      "op": "forall",
+      "binding": "receipt",
+      "domain": "receipts",
+      "body": {
+        "op": "atom",
+        "predicate": "claim.supported",
+        "args": [
+          {
+            "var": "receipt"
+          }
+        ]
+      }
+    }
+  }
+}

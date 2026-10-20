@@ -20,9 +20,10 @@ detail into mandatory AI context.
 - [x] Separate information value, strict status, completion, and gate contribution.
 - [x] Compare the logical layer against an independent Python implementation.
 - [x] Add machine-readable diagnostics and CI for the reference subset.
-- [ ] Add typed, immutable, content-identified finite closed-domain quantification.
+- [x] Add typed, immutable, content-identified finite closed-domain quantification.
+- [x] Require closure support for exact domain content and check empty bodies statically.
 - [ ] Extend independent language coverage to type and evidence boundaries.
-- [ ] Define and test evidence eligibility inputs and content identity bindings.
+- [ ] Verify evidence eligibility and extend domain content bindings to full semantic content identities.
 - [ ] Experiment with compact projection, deterministic expansion, and identity verification.
 - [ ] Measure representation size, context cost, and correctness before freezing a wire format.
 

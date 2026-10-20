@@ -1,4 +1,4 @@
-import { EvaluationError } from "./evaluator.mjs";
+import { EvaluationError } from "./validation.mjs";
 
 // JSON.parse alone silently overwrites duplicate keys. Keep that ambiguity out
 // of the CLI boundary, without interpreting source text as executable code.

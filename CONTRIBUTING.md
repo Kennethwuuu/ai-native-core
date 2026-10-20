@@ -48,6 +48,6 @@ A good RFC should include:
 ## Current priority
 
 The current priority is to falsify the RFC-0006 constraint semantics with small
-executable cases, then test typed finite domains and evidence boundaries. Avoid
+executable cases, including typed finite domains and evidence boundaries. Avoid
 a large compiler/runtime stack and do not call constraint satisfaction a full
 authorization decision.

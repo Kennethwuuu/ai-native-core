@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const vectors = JSON.parse(readFileSync(new URL("../four-valued-constraint-vectors.json", import.meta.url), "utf8"));
 const lit = (type, value) => ({ type, value });
 const atom = (predicate, ...args) => ({ op: "atom", predicate, args });
-const claim = (id) => atom("claim.supported", lit("String", id));
+const claim = (id) => atom("claim.supported", lit("ClaimId", id));
 const valueExpr = (value) => claim(value);
 const requireExpr = (expr) => ({ id: "test", form: "require", expr });
 const support = (positive_support_ids = [], negative_support_ids = []) => ({ positive_support_ids, negative_support_ids });

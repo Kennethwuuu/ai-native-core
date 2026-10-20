@@ -1,59 +1,30 @@
 import * as logic from "./logic.mjs";
+import { EvaluationError, fail, own, record, text, ids, typed, list } from "./validation.mjs";
+import { domainContentId, closureClaimId, validateDomain, MAX_DOMAIN_MEMBERS } from "./domains.mjs";
+export { EvaluationError } from "./validation.mjs";
 
-export const PROFILE = "aicore.reference-evaluator/0.1";
-export const VOCABULARY_ID = "aicore.reference-vocabulary/0.1";
-export const EVALUATOR_ID = "aicore.js-reference/0.1";
-export const DEFAULT_LIMITS = Object.freeze({ max_depth: 64, max_nodes: 5000, max_atoms: 1000 });
-
-export class EvaluationError extends Error {
-  constructor(completion, code, path, message) {
-    super(message);
-    Object.assign(this, { completion, code, path });
-  }
-}
-const fail = (code, path, message, completion = "INVALID") => {
-  throw new EvaluationError(completion, code, path, message);
-};
-const own = (x, key) => Object.hasOwn(x, key);
-function record(x, path, required, optional = []) {
-  if (x === null || typeof x !== "object" || Array.isArray(x)
-      || ![Object.prototype, null].includes(Object.getPrototypeOf(x))) {
-    fail("EXPECTED_RECORD", path, "Expected a plain record");
-  }
-  for (const key of required) if (!own(x, key)) fail("MISSING_FIELD", `${path}.${key}`, "Required field is missing");
-  for (const key of Object.keys(x)) {
-    if (!required.includes(key) && !optional.includes(key)) fail("UNKNOWN_FIELD", `${path}.${key}`, "Unknown field");
-  }
-}
-function text(x, path) {
-  if (typeof x !== "string" || !x.length || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(x)) {
-    fail("EXPECTED_ID", path, "Expected a nonempty Unicode scalar string");
-  }
-}
-function ids(x, path) {
-  if (!Array.isArray(x)) fail("EXPECTED_LIST", path, "Expected a list of identifiers");
-  x.forEach((id, i) => text(id, `${path}[${i}]`));
-  if (new Set(x).size !== x.length) fail("DUPLICATE_ID", path, "Duplicate identifier");
-}
-function typed(x, path) {
-  record(x, path, ["type", "value"]);
-  if (x.type === "Bool2" && typeof x.value === "boolean") return x;
-  if (x.type === "Int53" && Number.isSafeInteger(x.value) && !Object.is(x.value, -0)) return x;
-  if (x.type === "String" && typeof x.value === "string"
-      && !/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(x.value)) return x;
-  fail("INVALID_TYPED_VALUE", path, "Expected Bool2, bounded Int53, or a Unicode scalar String; no coercion");
-}
+export const PROFILE = "aicore.reference-evaluator/0.2";
+export const LEGACY_PROFILE = "aicore.reference-evaluator/0.1";
+export const VOCABULARY_ID = "aicore.reference-vocabulary/0.2";
+export const LEGACY_VOCABULARY_ID = "aicore.reference-vocabulary/0.1";
+export const EVALUATOR_ID = "aicore.js-reference/0.2";
+const LEGACY_LIMITS = Object.freeze({ max_depth: 64, max_nodes: 5000, max_atoms: 1000 });
+export const DEFAULT_LIMITS = Object.freeze({ ...LEGACY_LIMITS, max_domain_members: MAX_DOMAIN_MEMBERS, max_instantiations: 1000 });
 
 // The registry is fixed for this version. Requests cannot register host code.
-const signature = (args, method) => Object.freeze({ args: Object.freeze(args), method });
+const signature = (args, method, result) => Object.freeze({ args: Object.freeze(args), method, result });
 const functions = Object.freeze({
-  "bool.not": signature(["Bool2"], (a) => ({ type: "Bool2", value: !a })),
+  "bool.not": signature(["Bool2"], (a) => ({ type: "Bool2", value: !a }), "Bool2"),
 });
-const predicates = Object.freeze({
+const legacyPredicates = Object.freeze({
   "int.le": signature(["Int53", "Int53"], (a, b) => a <= b),
   "string.equal": signature(["String", "String"], (a, b) => a === b),
   "bool.equal": signature(["Bool2", "Bool2"], (a, b) => a === b),
   "claim.supported": signature(["String"], null),
+});
+const predicates = Object.freeze({
+  ...legacyPredicates,
+  "claim.supported": signature(["ClaimId"], null),
 });
 
 export function contribution(completion, constraintStatus) {
@@ -70,17 +41,28 @@ export function contribution(completion, constraintStatus) {
 export function evaluate(request) {
   const base = { profile: PROFILE, vocabulary_id: VOCABULARY_ID, evaluator_id: EVALUATOR_ID };
   const observations = [];
+  const domainChecks = [];
   const stats = { nodes: 0, atoms: 0 };
   try {
+    const quantified = request?.profile === PROFILE;
+    if (quantified) { stats.validation_nodes = 0; stats.instantiations = 0; }
     record(request, "$", ["profile", "vocabulary_id", "subject_id", "snapshot_id", "evidence_view_id",
-      "scope", "context", "bindings", "claims", "constraint"], ["limits"]);
-    if (request.profile !== PROFILE || request.vocabulary_id !== VOCABULARY_ID) fail("UNSUPPORTED_PROFILE", "$", "Unknown evaluator profile or vocabulary");
+      "scope", "context", "bindings", "claims", "constraint"], quantified ? ["limits", "domains"] : ["limits"]);
+    if (![PROFILE, LEGACY_PROFILE].includes(request.profile) || request.vocabulary_id !== (quantified ? VOCABULARY_ID : LEGACY_VOCABULARY_ID)) fail("UNSUPPORTED_PROFILE", "$", "Unknown evaluator profile or vocabulary");
+    base.profile = request.profile;
+    base.vocabulary_id = request.vocabulary_id;
+    const registry = quantified ? predicates : legacyPredicates;
+    function checkedTyped(value, path) {
+      typed(value, path);
+      if (!quantified && value.type === "ClaimId") fail("INVALID_TYPED_VALUE", path, "ClaimId requires vocabulary 0.2");
+      return value;
+    }
     if (request.scope !== "state") fail("UNSUPPORTED_SCOPE", "$.scope", "This subset supports only state scope");
     for (const key of ["subject_id", "snapshot_id", "evidence_view_id"]) {
       text(request[key], `$.${key}`); base[key] = request[key];
     }
     base.scope = request.scope;
-    const limits = { ...DEFAULT_LIMITS };
+    const limits = { ...(quantified ? DEFAULT_LIMITS : LEGACY_LIMITS) };
     if (own(request, "limits")) {
       record(request.limits, "$.limits", [], Object.keys(limits));
       for (const [key, value] of Object.entries(request.limits)) {
@@ -96,7 +78,7 @@ export function evaluate(request) {
     record(request.bindings, "$.bindings", [], Object.keys(request.bindings ?? {}));
     for (const [path, value] of Object.entries(request.bindings)) {
       if (!/^state\.[A-Za-z0-9_.-]+$/.test(path)) fail("INVALID_SCOPE_PATH", `$.bindings.${path}`, "Binding must be an explicit state path");
-      typed(value, `$.bindings.${path}`);
+      checkedTyped(value, `$.bindings.${path}`);
     }
     record(request.claims, "$.claims", [], Object.keys(request.claims ?? {}));
     for (const [id, support] of Object.entries(request.claims)) {
@@ -104,6 +86,19 @@ export function evaluate(request) {
       record(support, `$.claims.${id}`, ["positive_support_ids", "negative_support_ids"]);
       ids(support.positive_support_ids, `$.claims.${id}.positive_support_ids`);
       ids(support.negative_support_ids, `$.claims.${id}.negative_support_ids`);
+    }
+    const domains = quantified && own(request, "domains") ? request.domains : {};
+    record(domains, "$.domains", [], Object.keys(domains ?? {}));
+    for (const [id, domain] of Object.entries(domains)) {
+      const path = `$.domains.${id}`;
+      validateDomain(id, domain, path, limits.max_domain_members);
+      if (domain.subject_id !== request.subject_id || domain.snapshot_id !== request.snapshot_id || domain.scope !== request.scope) {
+        fail("DOMAIN_SCOPE_MISMATCH", path, "Domain must bind the exact request subject, snapshot, and scope");
+      }
+      if (typeof domain.content_id !== "string" || !/^aicore-domain-sha256:[0-9a-f]{64}$/.test(domain.content_id)) {
+        fail("INVALID_DOMAIN_ID", `${path}.content_id`, "Expected a domain content identity");
+      }
+      if (domain.content_id !== domainContentId(id, domain)) fail("DOMAIN_HASH_MISMATCH", `${path}.content_id`, "Domain content identity does not match its contents");
     }
     const constraint = request.constraint;
     record(constraint, "$.constraint", ["id", "form"], ["expr", "activation", "requirement"]);
@@ -113,21 +108,28 @@ export function evaluate(request) {
     else fail("UNSUPPORTED_CONSTRAINT", "$.constraint.form", "Expected require, forbid, or when_require");
     if (!request.context.complete) fail("MISSING_DEPENDENCY", "$.context", `Missing: ${request.context.missing_dependencies.join(", ")}`, "INCOMPLETE_CONTEXT");
 
-    function tick(path, depth) {
-      stats.nodes += 1;
-      if (depth > limits.max_depth || stats.nodes > limits.max_nodes) fail("RESOURCE_LIMIT", path, "Expression depth or node budget exhausted", "INDETERMINATE");
+    function tick(path, depth, checking = false) {
+      const counter = checking ? "validation_nodes" : "nodes";
+      stats[counter] += 1;
+      if (depth > limits.max_depth || stats[counter] > limits.max_nodes) fail("RESOURCE_LIMIT", path, "Expression depth or node budget exhausted", "INDETERMINATE");
     }
-    function argumentsFor(entry, args, path, depth) {
+    function argumentsFor(entry, args, path, depth, env, checking) {
       if (!Array.isArray(args) || args.length !== entry.args.length) fail("ARITY_MISMATCH", path, "Wrong argument count");
+      list(args, path);
       return args.map((arg, i) => {
-        const value = term(arg, `${path}[${i}]`, depth + 1);
+        const value = term(arg, `${path}[${i}]`, depth + 1, env, checking);
         if (value.type !== entry.args[i]) fail("TYPE_MISMATCH", `${path}[${i}]`, `Expected ${entry.args[i]}; received ${value.type}`);
         return value.value;
       });
     }
-    function term(node, path, depth) {
-      tick(path, depth);
-      record(node, path, [], ["type", "value", "ref", "call", "args"]);
+    function term(node, path, depth, env, checking) {
+      tick(path, depth, checking);
+      record(node, path, [], quantified ? ["type", "value", "ref", "call", "args", "var"] : ["type", "value", "ref", "call", "args"]);
+      if (quantified && own(node, "var")) {
+        record(node, path, ["var"]); text(node.var, `${path}.var`);
+        if (!env.has(node.var)) fail("UNBOUND_VARIABLE", path, "Variable is outside its lexical quantifier scope");
+        return env.get(node.var);
+      }
       if (own(node, "ref")) {
         record(node, path, ["ref"]); text(node.ref, `${path}.ref`);
         if (!node.ref.startsWith("state.")) fail("INVALID_SCOPE_PATH", path, "Reference is outside state scope");
@@ -139,20 +141,22 @@ export function evaluate(request) {
         text(node.call, `${path}.call`);
         if (!own(functions, node.call)) fail("UNKNOWN_FUNCTION", path, "Unknown value function");
         const entry = functions[node.call];
-        return entry.method(...argumentsFor(entry, node.args, `${path}.args`, depth));
+        const args = argumentsFor(entry, node.args, `${path}.args`, depth, env, checking);
+        return checking ? { type: entry.result } : entry.method(...args);
       }
-      return typed(node, path);
+      return checkedTyped(node, path);
     }
-    function expr(node, path, depth) {
-      tick(path, depth);
-      record(node, path, ["op"], ["predicate", "args", "expr", "items"]);
+    function expr(node, path, depth, env = new Map(), checking = false) {
+      tick(path, depth, checking);
+      record(node, path, ["op"], quantified ? ["predicate", "args", "expr", "items", "binding", "domain", "body"] : ["predicate", "args", "expr", "items"]);
       if (node.op === "atom") {
         record(node, path, ["op", "predicate", "args"]);
         text(node.predicate, `${path}.predicate`);
-        if (!own(predicates, node.predicate)) fail("UNKNOWN_PREDICATE", path, "Unknown predicate");
-        if (++stats.atoms > limits.max_atoms) fail("RESOURCE_LIMIT", path, "Atom budget exhausted", "INDETERMINATE");
-        const entry = predicates[node.predicate];
-        const args = argumentsFor(entry, node.args, `${path}.args`, depth);
+        if (!own(registry, node.predicate)) fail("UNKNOWN_PREDICATE", path, "Unknown predicate");
+        if (!checking && ++stats.atoms > limits.max_atoms) fail("RESOURCE_LIMIT", path, "Atom budget exhausted", "INDETERMINATE");
+        const entry = registry[node.predicate];
+        const args = argumentsFor(entry, node.args, `${path}.args`, depth, env, checking);
+        if (checking) return;
         let information_value;
         let support;
         if (node.predicate === "claim.supported") {
@@ -166,26 +170,66 @@ export function evaluate(request) {
         } else {
           information_value = entry.method(...args) ? "SUPPORTED_TRUE" : "SUPPORTED_FALSE";
           observations.push({ path, predicate_id: node.predicate, information_value, derivation: {
-            method_id: `${VOCABULARY_ID}#${node.predicate}`, snapshot_id: request.snapshot_id, arguments: args,
+            method_id: `${request.vocabulary_id}#${node.predicate}`, snapshot_id: request.snapshot_id, arguments: args,
           }, assumptions: [] });
         }
         return { path, information_value, strict_status: logic.atomicStatus(information_value) };
       }
       if (node.op === "not") {
         record(node, path, ["op", "expr"]);
-        const child = expr(node.expr, `${path}.expr`, depth + 1);
+        const child = expr(node.expr, `${path}.expr`, depth + 1, env, checking);
+        if (checking) return;
         return { path, information_value: logic.not(child.information_value), strict_status: logic.strictNot(child.strict_status), children: [child] };
       }
       if (["all", "any"].includes(node.op)) {
         record(node, path, ["op", "items"]);
-        if (!Array.isArray(node.items)) fail("EXPECTED_LIST", `${path}.items`, "Expected expression list");
+        list(node.items, `${path}.items`);
         // Always visit every operand; truth witnesses do not mask invalidity.
-        const children = node.items.map((x, i) => expr(x, `${path}.items[${i}]`, depth + 1));
-        const all = node.op === "all";
-        return { path, information_value: children.reduce((v, x) => (all ? logic.and : logic.or)(v, x.information_value), all ? "SUPPORTED_TRUE" : "SUPPORTED_FALSE"),
-          strict_status: children.reduce((v, x) => (all ? logic.strictAll : logic.strictAny)(v, x.strict_status), all ? "SATISFIED" : "VIOLATED"), children };
+        const children = node.items.map((x, i) => expr(x, `${path}.items[${i}]`, depth + 1, env, checking));
+        if (checking) return;
+        return fold(path, node.op === "all", children);
+      }
+      if (quantified && ["forall", "exists"].includes(node.op)) {
+        record(node, path, ["op", "binding", "domain", "body"]);
+        if (typeof node.binding !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(node.binding)) fail("INVALID_BINDING", `${path}.binding`, "Expected a lexical variable name");
+        if (env.has(node.binding)) fail("SHADOWED_BINDING", `${path}.binding`, "Nested quantifiers must use distinct variable names");
+        text(node.domain, `${path}.domain`);
+        if (!own(domains, node.domain)) fail("MISSING_DOMAIN", `${path}.domain`, "Required finite domain is unavailable", "INCOMPLETE_CONTEXT");
+        const domain = domains[node.domain];
+        const nested = new Map(env);
+        if (checking) {
+          const claimId = closureClaimId(domain.content_id);
+          const support = own(request.claims, claimId) ? request.claims[claimId] : { positive_support_ids: [], negative_support_ids: [] };
+          const value = logic.fromSupport(support.positive_support_ids.length > 0, support.negative_support_ids.length > 0);
+          domainChecks.push({ path, domain_id: node.domain, content_id: domain.content_id, closure_claim_id: claimId,
+            closure_information_value: value, positive_support_ids: [...support.positive_support_ids].sort(), negative_support_ids: [...support.negative_support_ids].sort() });
+          if (value !== "SUPPORTED_TRUE") fail("DOMAIN_NOT_CLOSED", `${path}.domain`, `Domain closure has ${value} support`, "INCOMPLETE_CONTEXT");
+          nested.set(node.binding, { type: domain.element_type });
+          expr(node.body, `${path}.body`, depth + 1, nested, true);
+          return;
+        }
+        const children = [];
+        for (const [index, value] of domain.members.entries()) {
+          if (++stats.instantiations > limits.max_instantiations) fail("INSTANTIATION_LIMIT", path, "Quantifier instantiation budget exhausted", "INDETERMINATE");
+          nested.set(node.binding, { type: domain.element_type, value });
+          children.push(expr(node.body, `${path}.members[${index}].body`, depth + 1, nested));
+        }
+        return { ...fold(path, node.op === "forall", children), domain_id: node.domain, domain_content_id: domain.content_id,
+          binding: node.binding, members: [...domain.members] };
       }
       fail("UNKNOWN_OPERATOR", `${path}.op`, "Unsupported expression operator");
+    }
+    function fold(path, all, children) {
+      return { path, information_value: children.reduce((v, x) => (all ? logic.and : logic.or)(v, x.information_value), all ? "SUPPORTED_TRUE" : "SUPPORTED_FALSE"),
+        strict_status: children.reduce((v, x) => (all ? logic.strictAll : logic.strictAny)(v, x.strict_status), all ? "SATISFIED" : "VIOLATED"), children };
+    }
+    if (quantified) {
+      // Validate the whole body even for empty domains; vacuity cannot hide an
+      // unsupported predicate, ill-typed term, unbound variable, or missing cut.
+      if (constraint.form === "when_require") {
+        expr(constraint.activation, "$.constraint.activation", 1, new Map(), true);
+        expr(constraint.requirement, "$.constraint.requirement", 1, new Map(), true);
+      } else expr(constraint.expr, "$.constraint.expr", 1, new Map(), true);
     }
     let details, constraintStatus;
     if (constraint.form === "when_require") {
@@ -202,10 +246,10 @@ export function evaluate(request) {
       };
     }
     return { ...base, completion: "COMPLETE", constraint_status: constraintStatus,
-      effectful_gate_contribution: contribution("COMPLETE", constraintStatus), ...details, observations, stats };
+      effectful_gate_contribution: contribution("COMPLETE", constraintStatus), ...details, observations, domain_checks: domainChecks, stats };
   } catch (error) {
     if (!(error instanceof EvaluationError)) throw error;
     return { ...base, completion: error.completion, effectful_gate_contribution: contribution(error.completion),
-      diagnostics: [{ code: error.code, path: error.path, message: error.message }], observations, stats };
+      diagnostics: [{ code: error.code, path: error.path, message: error.message }], observations, domain_checks: domainChecks, stats };
   }
 }

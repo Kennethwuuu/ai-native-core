@@ -3,9 +3,11 @@
 
 Default: verify the published vectors and finite algebraic laws.
 --batch: evaluate reduced logical ASTs from JSON on stdin for differential tests.
+--domain-ids: independently compute restricted finite-domain content identities.
 This oracle does not implement the JS evaluator's type or evidence boundary.
 """
 import itertools
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -59,17 +61,22 @@ def guarded(a, r):
     return r if a == "SATISFIED" else a
 
 
-def expr(node):
+def expr(node, env=None):
+    env = {} if env is None else env
     op = node["op"]
     if op == "atom":
-        value = node["value"]
+        value = env[node["variable"]] if "variable" in node else node["value"]
         return {"information_value": value, "strict_status": ATOMIC[value]}
     if op == "not":
-        child = expr(node["expr"])
+        child = expr(node["expr"], env)
         return {"information_value": negate(child["information_value"]), "strict_status": strict_not(child["strict_status"])}
-    if op not in ("all", "any"):
+    if op in ("forall", "exists"):
+        children = [expr(node["body"], {**env, node["binding"]: value}) for value in node["members"]]
+        op = "all" if op == "forall" else "any"
+    elif op in ("all", "any"):
+        children = [expr(x, env) for x in node["items"]]
+    else:
         raise ValueError("unsupported oracle operator")
-    children = [expr(x) for x in node["items"]]
     value = "SUPPORTED_TRUE" if op == "all" else "SUPPORTED_FALSE"
     for child in children:
         value = combine("and" if op == "all" else "or", value, child["information_value"])
@@ -90,6 +97,38 @@ def constraint(node):
     elif form != "require":
         raise ValueError("unsupported oracle constraint")
     return result
+
+
+def domain_id(item):
+    """Independent encoding for the primitive-only, ordered domain profile."""
+    d = item["domain"]
+    for identifier in (item["id"], d["subject_id"], d["snapshot_id"]):
+        if not isinstance(identifier, str) or not identifier:
+            raise ValueError("invalid domain identifier")
+        identifier.encode("utf-8")
+    if d["scope"] != "state" or not isinstance(d["members"], list) or len(d["members"]) > 1000:
+        raise ValueError("unsupported domain")
+    for value in d["members"]:
+        value_type = d["element_type"]
+        if value_type == "Bool2":
+            valid = type(value) is bool
+        elif value_type == "Int53":
+            valid = type(value) is int and abs(value) <= 9007199254740991
+        elif value_type in ("String", "ClaimId"):
+            valid = isinstance(value, str) and (value_type != "ClaimId" or bool(value))
+            if valid:
+                value.encode("utf-8")
+        else:
+            valid = False
+        if not valid:
+            raise ValueError("invalid typed member")
+    values = [json.dumps(x, ensure_ascii=False) for x in d["members"]]
+    if len(set(values)) != len(values):
+        raise ValueError("duplicate member")
+    data = [item["id"], d["subject_id"], d["snapshot_id"], d["scope"], d["element_type"], d["members"]]
+    encoded = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    digest = hashlib.sha256(b"ai-native-core/finite-domain/0.1\x00" + encoded).hexdigest()
+    return "aicore-domain-sha256:" + digest
 
 
 def verify():
@@ -146,7 +185,9 @@ def verify():
 if __name__ == "__main__":
     if sys.argv[1:] == ["--batch"]:
         print(json.dumps([constraint(x) for x in json.load(sys.stdin)]))
+    elif sys.argv[1:] == ["--domain-ids"]:
+        print(json.dumps([domain_id(x) for x in json.load(sys.stdin)]))
     elif sys.argv[1:]:
-        raise SystemExit("Usage: logic_oracle.py [--batch]")
+        raise SystemExit("Usage: logic_oracle.py [--batch|--domain-ids]")
     else:
         verify()
