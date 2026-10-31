@@ -11,6 +11,7 @@ Use Node.js 22+ and Python 3.12+. No dependencies need to be installed.
 ```bash
 npm test
 node bin/aicore.mjs evaluate examples/payment-receipt.request.json
+npm run measure:block
 ```
 
 For semantic fixes, include a counterexample that fails before the change and
@@ -22,6 +23,12 @@ Evidence changes must also preserve the [test-adapter trust boundary](docs/TEST-
 the model's request cannot provide trust anchors, time, or the expected evidence
 manifest. An excluded report does not imply negative support, and unknown
 verification cannot be hidden by another true expression branch.
+
+Block changes must preserve the [compact/audit contract](docs/CONSTRAINT-BLOCKS.md):
+check exact round trips, canonical identity, static boundary closure, and
+caller-pinned export requirements. A context budget must never silently remove
+a mandatory constraint. Report byte measurements as bytes and retain
+counterexamples; token or AI-performance claims require their own evidence.
 
 ## Before adding syntax
 
@@ -53,6 +60,7 @@ A good RFC should include:
 ## Current priority
 
 The current priority is to falsify the RFC-0006 constraint semantics with small
-executable cases, including typed finite domains and evidence boundaries. Avoid
+executable cases, including typed finite domains, evidence boundaries, and
+constraint Block identities. Avoid
 a large compiler/runtime stack and do not call constraint satisfaction a full
 authorization decision.

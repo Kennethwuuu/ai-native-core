@@ -10,6 +10,11 @@ reports, use the separate [signed evidence adapter](TEST-EVIDENCE.md) and its
 `evaluate-evidence` command. The bare `evaluate` command continues to accept
 caller-preselected support sets.
 
+For statically closed constraint subgraphs, content-addressed compact/audit
+conversion, and assessment of a caller-pinned export, see the separate
+[constraint Block experiment](CONSTRAINT-BLOCKS.md). Its first profile deliberately
+excludes finite quantifiers and does not replace the bare evaluator.
+
 ## Run it
 
 Requirements: Node.js 22 or later; Python 3.12 or later for the independent

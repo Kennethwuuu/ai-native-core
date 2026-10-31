@@ -27,12 +27,22 @@ detail into mandatory AI context.
 - [ ] Extend independent language coverage to type and evidence boundaries.
 - [ ] Extend test-report qualification to general evidence dependencies and domain closure attestations.
 - [ ] Integrate a production CI producer and externally maintained trust/revocation views.
-- [ ] Extend domain content bindings to full semantic content identities.
-- [ ] Experiment with compact projection, deterministic expansion, and identity verification.
-- [ ] Measure representation size, context cost, and correctness before freezing a wire format.
+- [x] Add content identities for a statically closed, constraint-only Block profile.
+- [x] Experiment with compact projection, deterministic audit expansion, and identity verification.
+- [x] Preserve required export dependencies and explicit runtime/authority cuts in an advisory static slice.
+- [x] Pin the caller's Block content and export before combining individual constraint assessments.
+- [x] Publish reproducible canonical-byte measurements, including a slice-overhead counterexample.
+- [ ] Extend identities to Program manifests, cross-Block bindings, and cyclic topology.
+- [ ] Add independently verifiable Context identity, membership, and broader purpose profiles.
+- [ ] Measure token cost and task correctness across larger examples and heterogeneous models before freezing a wire format.
 
 A human-syntax parser follows evidence that the typed representation is useful.
 A general executor is not the current milestone.
+
+The [Block experiment](docs/CONSTRAINT-BLOCKS.md) covers pure constraint
+subgraphs. Its static context is advisory and cannot be used as an assessment
+contract. The three-constraint example confirms compact/audit fidelity but also
+shows that a smaller selected graph can require more bytes after context metadata.
 
 ## Phase 2 — Verifier
 

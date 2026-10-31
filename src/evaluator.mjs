@@ -2,6 +2,7 @@ import * as logic from "./logic.mjs";
 import { EvaluationError, fail, own, record, text, ids, typed, list } from "./validation.mjs";
 import { domainContentId, closureClaimId, validateDomain, MAX_DOMAIN_MEMBERS } from "./domains.mjs";
 import { assertResultBudget, DIAGNOSTIC_LIMITS } from "./diagnostics.mjs";
+import { valueFunctions as functions, legacyPredicates, predicates } from "./vocabulary.mjs";
 export { EvaluationError } from "./validation.mjs";
 
 export const PROFILE = "aicore.reference-evaluator/0.2";
@@ -11,22 +12,6 @@ export const LEGACY_VOCABULARY_ID = "aicore.reference-vocabulary/0.1";
 export const EVALUATOR_ID = "aicore.js-reference/0.2.1";
 const LEGACY_LIMITS = Object.freeze({ max_depth: 64, max_nodes: 5000, max_atoms: 1000 });
 export const DEFAULT_LIMITS = Object.freeze({ ...LEGACY_LIMITS, max_domain_members: MAX_DOMAIN_MEMBERS, max_instantiations: 1000 });
-
-// The registry is fixed for this version. Requests cannot register host code.
-const signature = (args, method, result) => Object.freeze({ args: Object.freeze(args), method, result });
-const functions = Object.freeze({
-  "bool.not": signature(["Bool2"], (a) => ({ type: "Bool2", value: !a }), "Bool2"),
-});
-const legacyPredicates = Object.freeze({
-  "int.le": signature(["Int53", "Int53"], (a, b) => a <= b),
-  "string.equal": signature(["String", "String"], (a, b) => a === b),
-  "bool.equal": signature(["Bool2", "Bool2"], (a, b) => a === b),
-  "claim.supported": signature(["String"], null),
-});
-const predicates = Object.freeze({
-  ...legacyPredicates,
-  "claim.supported": signature(["ClaimId"], null),
-});
 
 export function contribution(completion, constraintStatus) {
   if (completion === "INVALID") return "DENY";
