@@ -1,0 +1,32 @@
+{
+  "profile": "aicore.test-evidence-trust/0.1",
+  "evaluated_at_ms": 1793457606585,
+  "max_age_ms": 3600000,
+  "revocations_complete": true,
+  "revoked_evidence_ids": [],
+  "keys": {
+    "local-demo:key-1": {
+      "producer_id": "local-demo:reference-runner",
+      "status": "ACTIVE",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAmhNuj6tFtcOL5Ec7N2hdQZwLqlo6d2uGZTJee6HdFvA=\n-----END PUBLIC KEY-----\n"
+    }
+  },
+  "suites": {
+    "reference-conformance": {
+      "environment_id": "node:v24.22.1/python:3.12.14/linux-x64",
+      "min_tests": 37,
+      "accepted_producers": [
+        "local-demo:reference-runner"
+      ]
+    }
+  },
+  "evidence_manifest": {
+    "subject_id": "repository:Kennethwuuu/ai-native-core",
+    "snapshot_id": "git-commit-sha1:6028225c0b31b455ed4f96f577a13af77a6ed9a6",
+    "scope": "state",
+    "complete": true,
+    "evidence_ids": [
+      "aicore-evidence-sha256:0eabc5d6a0dd14bc9e71b072993ced3fa6cb4f09020717907918a084c7934750"
+    ]
+  }
+}

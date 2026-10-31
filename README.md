@@ -45,7 +45,43 @@ Human-facing forms are derived from this kernel:
 - `flow` — transition composition;
 - `block` — an interface-closed semantic subgraph.
 
-These definitions are a falsifiable research hypothesis, not a stable language standard. See [RFC-0001](rfcs/RFC-0001-core-model.md).
+These definitions are a falsifiable research hypothesis, not a stable language standard. See [RFC-0001](RFC-0001-core-model.md).
+
+## Run the first executable experiment
+
+The reference evaluator implements a small typed subset of
+[RFC-0006](RFC-0006-four-valued-constraint-core.md). It keeps four-valued logical
+support separate from strict constraint status, evaluation completion, and
+execution policy.
+
+With Node.js 22+ and Python 3.12+ installed, no package installation is needed:
+
+```bash
+npm test
+node bin/aicore.mjs evaluate examples/payment-receipt.request.json
+node bin/aicore.mjs evaluate examples/all-receipts.request.json
+node bin/aicore.mjs evaluate-evidence examples/test-evidence.request.json examples/test-evidence.trust.json
+```
+
+The payment example returns `COMPLETE`, constraint `UNKNOWN`, and gate
+contribution `DEFER`: capture is supported, but an accepted receipt has no
+eligible support yet. The evaluator does not execute a payment or authorize an
+action. Its only gate contributions are `CONTINUE`, `DENY`, and `DEFER`.
+
+See the [reference evaluator guide](docs/REFERENCE-EVALUATOR.md) for the typed
+vocabulary, request format, limits, diagnostics, and cross-language test scope.
+Profile `0.2` adds [finite-domain quantifiers](docs/FINITE-DOMAINS.md): complete
+body type checking, lexical bindings, content-verified domains, and closure
+support tied to each exact domain digest. Profile `0.1` requests still work.
+The [validation report](docs/VALIDATION-2026-10-20.md) records independent and
+adversarial checks, including a fixed diagnostic-expansion defect and its
+resource ceilings.
+
+The [signed test-evidence adapter](docs/TEST-EVIDENCE.md) adds a caller-owned
+trust context and evidence manifest, signature/report-digest checks, exact commit
+binding, validity/freshness checks, and revocation handling before constraints
+receive support. Its replay fixture records a successful test run of commit
+`6028225`; it does not certify the current branch or perform a deployment.
 
 ## Example
 
@@ -84,33 +120,51 @@ The point is not the final syntax. The point is that success, failure, unknown
 outcomes, effects, authority, and preserved constraints are visible before an
 implementation is chosen.
 
-## Repository layout
+## Specification and implementation
 
-- `docs/PRINCIPLES.md` — project philosophy and constraints
-- `docs/RELATED-WORK.md` — prior art and research boundaries
-- `rfcs/RFC-0001-core-model.md` — first semantic-core proposal
-- `spec/grammar.ebnf` — intentionally small syntax sketch
-- `examples/` — readable examples
-- `AI Native Core — Foundations v0.1.md` — extended research foundations
-- `CONTRIBUTING.md` — how to propose changes
+| File | Purpose |
+|---|---|
+| [RFC-0001](RFC-0001-core-model.md) | State, Transition, Constraint, and closed Block boundaries |
+| [RFC-0002](RFC-0002-knowledge-and-evidence.md) | Knowledge, evidence, eligibility, and execution gates |
+| [RFC-0003](RFC-0003-composition-concurrency-failure.md) | Composition, concurrency, uncertain outcomes, and compensation |
+| [RFC-0004](RFC-0004-canonical-ir-and-deterministic-encoding.md) | Canonical IR and deterministic encoding |
+| [Phase 0 retrospective](PHASE-0-RETROSPECTIVE.md) | Critique of representation growth and layered context |
+| [RFC-0005](RFC-0005-semantic-blocks-and-context-projections.md) | Semantic Blocks, layered IR, and Context projections |
+| [RFC-0006](RFC-0006-four-valued-constraint-core.md) | Four-valued information logic and typed constraints |
+| [Reference evaluator](docs/REFERENCE-EVALUATOR.md) | Executable subset, wire profile, and limitations |
+| [Test evidence](docs/TEST-EVIDENCE.md) | Signed reports, eligibility, trusted manifests, and scoped replay |
+| [Related work](RELATED-WORK.md) | Prior art and research boundaries |
+
+`src/` contains the pure JS logic, evaluator, and strict JSON boundary; `bin/`
+contains the CLI. `test/` contains integration and differential tests, and
+`tools/logic_oracle.py` independently checks the logical layer. The original
+standalone checker remains `verify-four-valued-constraints.mjs` at the root.
+
+The root `.aicore` examples are provisional human projections; the CLI accepts
+the JSON request under `examples/`, not that unfinished surface syntax. The
+Foundations v0.1 document is historical context; later RFCs amend it.
 
 ## Status
 
-**Pre-alpha / Phase 0 semantic design.**
+**Pre-alpha / Phase 1 reference constraint experiment.**
 
-Nothing in this repository should yet be considered stable. The first milestone
-is not a compiler. It is a compact semantic model that survives adversarial
-review across payment workflows, AI-agent tasks, pure computation, concurrency,
-and multiple implementation languages.
+Nothing in this repository should yet be considered stable. The executable
+subset supports state-scoped typed predicates, four-valued expressions, three
+constraint forms, finite closed-domain quantifiers, and bounded evaluation. It does not yet implement a full
+verifier, canonicalizer, parser for `.aicore`, or general runtime. Python/JS
+differential agreement covers the logical layer, quantifier denotation, and
+restricted domain identities. A signed test-report adapter now qualifies that
+evidence subset; its trust anchors, complete manifest, and live/replay context
+remain caller-owned.
 
 ## Open questions
 
 - Do State, Transition, and Constraint remain sufficient under asynchronous,
   concurrent, and partially observed behavior?
-- What constraint language is both verifiable and useful for trace properties?
+- Can the bounded constraint fragment express useful finite-trace properties?
 - Which effect-footprint rules make parallel composition safe?
 - What is the smallest explicit capability model?
-- How should unknown and conflicting claims propagate?
+- How should evidence eligibility and provenance connect to the executable fragment?
 - What observation boundary defines contract equivalence?
 - Can deterministic typed graph IR improve AI retrieval and semantic patching?
 - How should AI friendliness be benchmarked across heterogeneous models?

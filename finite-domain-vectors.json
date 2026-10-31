@@ -1,0 +1,79 @@
+{
+  "profile": "aicore.finite-domain/0.1",
+  "cases": [
+    {
+      "id": "integers",
+      "domain": {
+        "subject_id": "subject:42",
+        "snapshot_id": "snapshot:v1",
+        "scope": "state",
+        "element_type": "Int53",
+        "members": [
+          -9007199254740991,
+          0,
+          9007199254740991
+        ]
+      },
+      "content_id": "aicore-domain-sha256:6c1cd5da69639ae302672c78566d956a8933024fbf785f278b39c03119c81432"
+    },
+    {
+      "id": "unicode:猫",
+      "domain": {
+        "subject_id": "subject:42",
+        "snapshot_id": "snapshot:v1",
+        "scope": "state",
+        "element_type": "String",
+        "members": [
+          "",
+          "🐱",
+          "é",
+          "é",
+          " ",
+          "quote\"",
+          "line\n",
+          "\\"
+        ]
+      },
+      "content_id": "aicore-domain-sha256:867b8f9734b053e92fc072fffe6946cdb1fc32087643b33cba08832235c18842"
+    },
+    {
+      "id": "booleans",
+      "domain": {
+        "subject_id": "subject:42",
+        "snapshot_id": "snapshot:v1",
+        "scope": "state",
+        "element_type": "Bool2",
+        "members": [
+          false,
+          true
+        ]
+      },
+      "content_id": "aicore-domain-sha256:2f59a50d6d5c90c77f2df8b3034151612ffaf56a47f8faaaaef874f5c65e2af4"
+    },
+    {
+      "id": "empty",
+      "domain": {
+        "subject_id": "subject:42",
+        "snapshot_id": "snapshot:v1",
+        "scope": "state",
+        "element_type": "ClaimId",
+        "members": []
+      },
+      "content_id": "aicore-domain-sha256:9df1a226b666a317cf7103d1cfc526d40eec34c56ca1af8ca953fab9547cfdcd"
+    },
+    {
+      "id": "claims",
+      "domain": {
+        "subject_id": "subject:42",
+        "snapshot_id": "snapshot:v1",
+        "scope": "state",
+        "element_type": "ClaimId",
+        "members": [
+          "payment:captured",
+          "receipt:accepted"
+        ]
+      },
+      "content_id": "aicore-domain-sha256:eb83c878a9f26ff525d7db0c6273c6eef681db8a45986940507aba0457c36eb4"
+    }
+  ]
+}

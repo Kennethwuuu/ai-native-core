@@ -1,0 +1,51 @@
+{
+  "profile": "aicore.evidence-evaluation/0.1",
+  "evaluation": {
+    "profile": "aicore.reference-evaluator/0.2",
+    "vocabulary_id": "aicore.reference-vocabulary/0.2",
+    "subject_id": "repository:Kennethwuuu/ai-native-core",
+    "snapshot_id": "git-commit-sha1:6028225c0b31b455ed4f96f577a13af77a6ed9a6",
+    "scope": "state",
+    "context": {
+      "complete": true,
+      "missing_dependencies": []
+    },
+    "bindings": {},
+    "constraint": {
+      "id": "TestsBeforeReview",
+      "form": "require",
+      "expr": {
+        "op": "atom",
+        "predicate": "claim.supported",
+        "args": [
+          {
+            "type": "ClaimId",
+            "value": "test-suite.passed:reference-conformance"
+          }
+        ]
+      }
+    }
+  },
+  "evidence": [
+    {
+      "profile": "aicore.test-evidence/0.1",
+      "key_id": "local-demo:key-1",
+      "producer_id": "local-demo:reference-runner",
+      "subject_id": "repository:Kennethwuuu/ai-native-core",
+      "snapshot_id": "git-commit-sha1:6028225c0b31b455ed4f96f577a13af77a6ed9a6",
+      "scope": "state",
+      "method_id": "aicore.test-run/0.1",
+      "environment_id": "node:v24.22.1/python:3.12.14/linux-x64",
+      "observed_at_ms": 1793457606584,
+      "expires_at_ms": 1793461206584,
+      "artifact_digest": "aicore-test-report-sha256:5aabd0aa0131981c44b59fa0c30873691f0be2b44224a2af68ad4917db975c4b",
+      "report": {
+        "suite_id": "reference-conformance",
+        "outcome": "PASSED",
+        "tests_run": 37,
+        "tests_failed": 0
+      },
+      "signature": "nIzeMYvUWOsP9UhO4iugeXpeMDrIGnHeqfWbq7a71191On6yt8CCkdLEyr5fDas4lXJFC0/qzeFRlV8NDugJAA=="
+    }
+  ]
+}

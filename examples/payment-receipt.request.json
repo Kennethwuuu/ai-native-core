@@ -1,0 +1,30 @@
+{
+  "profile": "aicore.reference-evaluator/0.1",
+  "vocabulary_id": "aicore.reference-vocabulary/0.1",
+  "subject_id": "order:42",
+  "snapshot_id": "snapshot:order-42:v1",
+  "evidence_view_id": "eligible-support:order-42:v1",
+  "scope": "state",
+  "context": { "complete": true, "missing_dependencies": [] },
+  "bindings": { "state.total_minor": { "type": "Int53", "value": 1000 } },
+  "claims": {
+    "payment.captured:attempt-42": {
+      "positive_support_ids": ["gateway:charge-42"],
+      "negative_support_ids": []
+    }
+  },
+  "constraint": {
+    "id": "ShipmentRequiresAcceptedReceipt",
+    "form": "when_require",
+    "activation": {
+      "op": "atom",
+      "predicate": "claim.supported",
+      "args": [{ "type": "String", "value": "payment.captured:attempt-42" }]
+    },
+    "requirement": {
+      "op": "atom",
+      "predicate": "claim.supported",
+      "args": [{ "type": "String", "value": "receipt.accepted:attempt-42" }]
+    }
+  }
+}
