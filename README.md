@@ -61,6 +61,7 @@ npm test
 node bin/aicore.mjs evaluate examples/payment-receipt.request.json
 node bin/aicore.mjs evaluate examples/all-receipts.request.json
 node bin/aicore.mjs evaluate-evidence examples/test-evidence.request.json examples/test-evidence.trust.json
+node bin/aicore.mjs assess-block examples/review-readiness.block.json examples/review-readiness.runtime.json examples/review-readiness.authority.json
 ```
 
 The payment example returns `COMPLETE`, constraint `UNKNOWN`, and gate
@@ -82,6 +83,14 @@ trust context and evidence manifest, signature/report-digest checks, exact commi
 binding, validity/freshness checks, and revocation handling before constraints
 receive support. Its replay fixture records a successful test run of commit
 `6028225`; it does not certify the current branch or perform a deployment.
+
+The [constraint Block experiment](docs/CONSTRAINT-BLOCKS.md) adds a closed static
+boundary, deterministic compact/audit round trips, content identities, and an
+advisory export context. Assessment pins the caller's exact Block and export.
+Run `npm run measure:block` to reproduce the first size comparison: compact is
+1,026 bytes versus 2,782 audit bytes, while the selected export slice costs
+1,249 bytes. This small slice is larger than the whole compact Block; no token
+or model-performance improvement is claimed.
 
 ## Example
 
@@ -133,6 +142,7 @@ implementation is chosen.
 | [RFC-0006](RFC-0006-four-valued-constraint-core.md) | Four-valued information logic and typed constraints |
 | [Reference evaluator](docs/REFERENCE-EVALUATOR.md) | Executable subset, wire profile, and limitations |
 | [Test evidence](docs/TEST-EVIDENCE.md) | Signed reports, eligibility, trusted manifests, and scoped replay |
+| [Constraint Blocks](docs/CONSTRAINT-BLOCKS.md) | Static closure, compact/audit codecs, pinned assessment, and measured bytes |
 | [Related work](RELATED-WORK.md) | Prior art and research boundaries |
 
 `src/` contains the pure JS logic, evaluator, and strict JSON boundary; `bin/`
@@ -151,11 +161,14 @@ Foundations v0.1 document is historical context; later RFCs amend it.
 Nothing in this repository should yet be considered stable. The executable
 subset supports state-scoped typed predicates, four-valued expressions, three
 constraint forms, finite closed-domain quantifiers, and bounded evaluation. It does not yet implement a full
-verifier, canonicalizer, parser for `.aicore`, or general runtime. Python/JS
+verifier, general canonicalizer, parser for `.aicore`, or general runtime. Python/JS
 differential agreement covers the logical layer, quantifier denotation, and
 restricted domain identities. A signed test-report adapter now qualifies that
 evidence subset; its trust anchors, complete manifest, and live/replay context
 remain caller-owned.
+The first constraint-only Block profile supports deterministic static identity
+and export slicing. It does not implement cross-Block Program manifests,
+Transition graphs, or execution-ready Context Bundles.
 
 ## Open questions
 

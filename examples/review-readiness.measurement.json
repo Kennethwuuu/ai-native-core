@@ -1,0 +1,21 @@
+{
+  "profile": "aicore.block-measurement/0.1",
+  "block_content_id": "aicore-block-sha256:a9ec178822e4505f92525e201531cd2a62c4fdacd4f30bef9dffb251dad92142",
+  "scope": "Static data for one example; no token or model-performance claim",
+  "focus_export": "prepare_review",
+  "compact": {
+    "canonical_bytes": 1026,
+    "constraints": 3
+  },
+  "audit": {
+    "canonical_bytes": 2782,
+    "constraints": 3
+  },
+  "static_context": {
+    "canonical_bytes": 1249,
+    "completeness": "COMPLETE",
+    "constraints": 2,
+    "cuts": 3
+  },
+  "round_trip_verified": true
+}

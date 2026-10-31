@@ -1,0 +1,74 @@
+{
+  "profile": "aicore.constraint-block/0.1",
+  "block_id": "ReviewReadiness",
+  "imports": {
+    "state": {
+      "state.change_count": "Int53",
+      "state.review_requested": "Bool2"
+    },
+    "claims": [
+      "test-suite.passed:reference-conformance"
+    ]
+  },
+  "constraints": {
+    "NonNegativeChanges": {
+      "form": "require",
+      "expr": {
+        "op": "atom",
+        "predicate": "int.le",
+        "args": [
+          {
+            "type": "Int53",
+            "value": 0
+          },
+          {
+            "ref": "state.change_count"
+          }
+        ]
+      }
+    },
+    "ReviewRequested": {
+      "form": "require",
+      "expr": {
+        "op": "atom",
+        "predicate": "bool.equal",
+        "args": [
+          {
+            "ref": "state.review_requested"
+          },
+          {
+            "type": "Bool2",
+            "value": true
+          }
+        ]
+      }
+    },
+    "TestsPassed": {
+      "form": "require",
+      "expr": {
+        "op": "atom",
+        "predicate": "claim.supported",
+        "args": [
+          {
+            "type": "ClaimId",
+            "value": "test-suite.passed:reference-conformance"
+          }
+        ]
+      }
+    }
+  },
+  "exports": {
+    "inspect_changes": [
+      "NonNegativeChanges"
+    ],
+    "prepare_review": [
+      "ReviewRequested",
+      "TestsPassed"
+    ]
+  },
+  "block_content_id": "aicore-block-sha256:a9ec178822e4505f92525e201531cd2a62c4fdacd4f30bef9dffb251dad92142",
+  "annotations": {
+    "description": "Only assess a review request; no publish, merge, or payment action.",
+    "label": "准备代码评审"
+  }
+}
