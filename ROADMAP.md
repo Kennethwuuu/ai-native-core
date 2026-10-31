@@ -22,8 +22,12 @@ detail into mandatory AI context.
 - [x] Add machine-readable diagnostics and CI for the reference subset.
 - [x] Add typed, immutable, content-identified finite closed-domain quantification.
 - [x] Require closure support for exact domain content and check empty bodies statically.
+- [x] Qualify signed test reports against caller-owned trust, manifest, code version, time, and revocation inputs.
+- [x] Replay a recorded real test run, preserving exclusion, unresolved verification, and conflicting evidence separately.
 - [ ] Extend independent language coverage to type and evidence boundaries.
-- [ ] Verify evidence eligibility and extend domain content bindings to full semantic content identities.
+- [ ] Extend test-report qualification to general evidence dependencies and domain closure attestations.
+- [ ] Integrate a production CI producer and externally maintained trust/revocation views.
+- [ ] Extend domain content bindings to full semantic content identities.
 - [ ] Experiment with compact projection, deterministic expansion, and identity verification.
 - [ ] Measure representation size, context cost, and correctness before freezing a wire format.
 

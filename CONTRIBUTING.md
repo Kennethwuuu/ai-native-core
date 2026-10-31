@@ -18,6 +18,11 @@ passes afterward. Logical changes must be checked against the normative vectors
 and independent Python oracle. Preserve the separation between unknown support,
 invalid input, resource exhaustion, and incomplete Context.
 
+Evidence changes must also preserve the [test-adapter trust boundary](docs/TEST-EVIDENCE.md):
+the model's request cannot provide trust anchors, time, or the expected evidence
+manifest. An excluded report does not imply negative support, and unknown
+verification cannot be hidden by another true expression branch.
+
 ## Before adding syntax
 
 Please ask:

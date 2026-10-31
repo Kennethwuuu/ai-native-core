@@ -60,6 +60,7 @@ With Node.js 22+ and Python 3.12+ installed, no package installation is needed:
 npm test
 node bin/aicore.mjs evaluate examples/payment-receipt.request.json
 node bin/aicore.mjs evaluate examples/all-receipts.request.json
+node bin/aicore.mjs evaluate-evidence examples/test-evidence.request.json examples/test-evidence.trust.json
 ```
 
 The payment example returns `COMPLETE`, constraint `UNKNOWN`, and gate
@@ -75,6 +76,12 @@ support tied to each exact domain digest. Profile `0.1` requests still work.
 The [validation report](docs/VALIDATION-2026-10-20.md) records independent and
 adversarial checks, including a fixed diagnostic-expansion defect and its
 resource ceilings.
+
+The [signed test-evidence adapter](docs/TEST-EVIDENCE.md) adds a caller-owned
+trust context and evidence manifest, signature/report-digest checks, exact commit
+binding, validity/freshness checks, and revocation handling before constraints
+receive support. Its replay fixture records a successful test run of commit
+`6028225`; it does not certify the current branch or perform a deployment.
 
 ## Example
 
@@ -125,6 +132,7 @@ implementation is chosen.
 | [RFC-0005](RFC-0005-semantic-blocks-and-context-projections.md) | Semantic Blocks, layered IR, and Context projections |
 | [RFC-0006](RFC-0006-four-valued-constraint-core.md) | Four-valued information logic and typed constraints |
 | [Reference evaluator](docs/REFERENCE-EVALUATOR.md) | Executable subset, wire profile, and limitations |
+| [Test evidence](docs/TEST-EVIDENCE.md) | Signed reports, eligibility, trusted manifests, and scoped replay |
 | [Related work](RELATED-WORK.md) | Prior art and research boundaries |
 
 `src/` contains the pure JS logic, evaluator, and strict JSON boundary; `bin/`
@@ -145,7 +153,9 @@ subset supports state-scoped typed predicates, four-valued expressions, three
 constraint forms, finite closed-domain quantifiers, and bounded evaluation. It does not yet implement a full
 verifier, canonicalizer, parser for `.aicore`, or general runtime. Python/JS
 differential agreement covers the logical layer, quantifier denotation, and
-restricted domain identities; evidence eligibility remains caller-supplied.
+restricted domain identities. A signed test-report adapter now qualifies that
+evidence subset; its trust anchors, complete manifest, and live/replay context
+remain caller-owned.
 
 ## Open questions
 

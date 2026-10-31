@@ -1,6 +1,6 @@
 {
   "name": "ai-native-core",
-  "version": "0.2.1-experimental",
+  "version": "0.3.0-experimental",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22" },

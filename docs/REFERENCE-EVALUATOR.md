@@ -1,9 +1,14 @@
 # Experimental reference evaluator
 
-This is the first executable subset of
+This guide describes the bare executable subset of
 [RFC-0006](../RFC-0006-four-valued-constraint-core.md). Its purpose is to test the
 constraint semantics against executable counterexamples. It is not a general
 executor, an evidence verifier, or a claim of full RFC-0006 conformance.
+
+For signature, scope, freshness and revocation qualification of recorded test
+reports, use the separate [signed evidence adapter](TEST-EVIDENCE.md) and its
+`evaluate-evidence` command. The bare `evaluate` command continues to accept
+caller-preselected support sets.
 
 ## Run it
 
@@ -251,7 +256,8 @@ tests is evidence of agreement on this fragment, not proof of the whole system.
 The test runner uses the [Node standard library](https://nodejs.org/api/test.html);
 the oracle uses the [Python standard library](https://docs.python.org/3/library/json.html).
 
-Full evidence eligibility, capability checks, general Program/Block canonical
+General evidence eligibility beyond the signed test-report adapter, capability
+checks, general Program/Block canonical
 content IDs, temporal properties, execution, compact IR, and token or
 correctness benchmarks remain future work. Results are experimental diagnostic
 records, not reusable verification attestations under RFC-0004.
